@@ -1,0 +1,67 @@
+# --- wgbs_keys.txt ---
+# Purpose: Provides ENCODE file accession keys for Whole Genome Bisulfite Sequencing (WGBS) data.
+#          Likely used to download or reference specific datasets for the analysis.
+# Chapter Relevance: Appendix B (WGBS Data Sources) / Chapter 5 Setup
+
+# This file appears to be a list of keys, not executable R code.
+# It should be treated as a supplementary data file or included in documentation.
+
+# Example of how this data might be used in R (conceptual):
+# wgbs_metadata <- read.table("wgbs_keys.txt", header=TRUE, sep="\t") # Assuming TSV format
+# download_urls <- paste0("https://www.encodeproject.org/files/", wgbs_metadata$Accession, "/@@download/", wgbs_metadata$Accession, ".bam")
+# # Then use download.file() or similar to fetch the data
+
+# Content of wgbs_keys.txt (as text, not R code):
+# ===================================================
+## Hindbrain
+# e10.5_1 = "ENCFF598AIN"
+# e10.5_2 = "ENCFF660DOP" #
+# e11.5_1 = "ENCFF916YWD"
+# e11.5_2 = "ENCFF383DGQ" #
+# e12.5_1 = "ENCFF581VJD"
+# e12.5_2 = "ENCFF733JRP" #
+# e13.5_1 = "ENCFF937FOZ"
+# e13.5_2 = "ENCFF214QNV" #
+# e14.5_1 = "ENCFF898FOZ"
+# e14.5_2 = "ENCFF560BSG" #
+# e15.5_1 = "ENCFF092LFB"
+# e15.5_2 = "ENCFF362QAG" #
+# e16.5_1 = "ENCFF351UKS"
+# e16.5_2 = "ENCFF631OBM" #
+# p0_1 = "ENCFF105ZHG"
+# p0_2 = "ENCFF696JYQ" #
+## Midbrain
+# e10.5_1 = "ENCFF192LFV"
+# e10.5_2 = "ENCFF724ZCI" #
+# e11.5_1 = "ENCFF943IBD"
+# e11.5_2 = "ENCFF580ZKC" #
+# e12.5_1 = "ENCFF910CHR"
+# e12.5_2 = "ENCFF147HUB" #
+# e13.5_1 = "ENCFF376OQK"
+# e13.5_2 = "ENCFF323DLV" #
+# e14.5_1 = "ENCFF496WRJ"
+# e14.5_2 = "ENCFF499EUN" #
+# e15.5_1 = "ENCFF354OEF"
+# e15.5_2 = "ENCFF678MHU" #
+# e16.5_1 = "ENCFF451ZEE"
+# e16.5_2 = "ENCFF529OUU" #
+# p0_1 = "ENCFF415LLK"
+# p0_2 = "ENCFF733TCH" #
+## Forebrain
+# e10.5_1 = "ENCFF288JMC"
+# e10.5_2 = "ENCFF461PTM" #
+# e11.5_1 = "ENCFF890XTY"
+# e11.5_2 = "ENCFF232QBX" #
+# e12.5_1 = "ENCFF535JWX"
+# e12.5_2 = "ENCFF667LWJ" #
+# e13.5_1 = "ENCFF673PJA"
+# e13.5_2 = "ENCFF320IBB" #
+# e14.5_1 = "ENCFF667IZN"
+# e14.5_2 = "ENCFF948AII" #
+# e15.5_1 = "ENCFF331SNN"
+# e15.5_2 = "ENCFF566THP" #
+# e16.5_1 = "ENCFF457SPJ"
+# e16.5_2 = "ENCFF480MYA" #
+# p0_1 = "ENCFF486VKI"
+# p0_2 = "ENCFF784IJC" #
+# =================================================== 

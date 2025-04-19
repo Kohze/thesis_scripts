@@ -1,0 +1,3114 @@
+Okay, let's organize and annotate these R code snippets based on their likely function within Chapters 4 and 5 of your thesis, "The Elusive Dynamic of the Genome."
+
+The general structure seems to be:
+*   **Chapter 4: Dynamic Alternative Splicing:** Focuses on DTU identification, isoform expression dynamics, temporal patterns, classification, and potentially sequence-based features influencing splicing (like the ProtR analysis).
+*   **Chapter 5: Epigenetic Splicing Influence:** Focuses on relating epigenetic factors (HMM states, DNA methylation, DNA shape) and sequence motifs to DTU events and splicing regulation.
+
+I'll create sections for each chapter and potential sub-sections, placing the code within the most appropriate context and adding annotations.
+
+---
+
+## General Setup / Data Preparation / Appendix Code
+
+This section contains code related to initial data loading, metadata management, and potentially scripts used for generating supplementary figures or data referenced in the appendices.
+
+### `metaScript.txt`: Metadata Processing
+
+```R
+# --- metaScript.txt ---
+# Purpose: Script for handling metadata, likely from ENCODE or similar sources.
+#          Used for associating file IDs with experimental details.
+# Chapter Relevance: General Setup / Appendix B (Data Sources)
+
+# Load necessary library
+library(dplyr)
+library(tidyr)
+library(rjson)
+library(jsonlite)
+
+# --- Reading and Filtering Metadata ---
+# Read metadata from a TSV file
+metadata = read.csv("./metadata.tsv", header=TRUE, sep = "\t")
+# Filter metadata (example: removing specific methylation output types)
+filteredMetadata = metadata[metadata$Output.type != "minus strand methylation state at CpG",]
+
+# --- Reading Sample/Timepoint Specific Metadata (Potentially WGBS or RNA-seq) ---
+# Example of reading multiple metadata files, perhaps containing file lists for different timepoints
+# (The original code seems incomplete here, showing multiple reads of "0.txt")
+# l0 = read.csv("./metadata/0.txt", header = FALSE)
+# l105 = read.csv("./metadata/0.txt", header = FALSE) # Corrected example below
+
+# --- Combining Metadata from Multiple Files ---
+# Define file names corresponding to different experimental conditions (e.g., timepoints)
+file_names <- c("0.txt", "10.5.txt", "11.5.txt", "12.5.txt", "13.5.txt", "14.5.txt", "15.5.txt", "16.5.txt")
+
+# Create an empty list to store the metadata data frames
+data_frames <- list()
+
+# Loop over the file names to read data and add a timepoint identifier
+for (file in file_names) {
+  # Construct the full file path
+  file_path <- file.path("./metadata/", file)
+  if (file.exists(file_path)) {
+    # Read the data from the file
+    data <- read.csv(file_path, header = FALSE)
+
+    # Remove the ".txt" file extension to get the timepoint/condition name
+    file_name <- sub("\\.txt$", "", file) # Use \\. to match literal dot
+
+    # Add the identifier (e.g., timepoint) to the data frame
+    data$time <- file_name # Or use a more descriptive name like 'timepoint'
+
+    # Add the data to the list of data frames
+    data_frames[[file]] <- data
+  } else {
+    warning(paste("File not found:", file_path))
+  }
+}
+
+# Combine all data frames into a single data frame
+if (length(data_frames) > 0) {
+  combined_data <- do.call(rbind, data_frames)
+  rownames(combined_data) <- NULL # Reset row names
+} else {
+  warning("No data files were successfully read.")
+  combined_data <- data.frame() # Create empty dataframe if no files read
+}
+
+
+# --- Extracting File Accession from URLs ---
+# Function to extract ENCODE-like file accession IDs from URLs
+extract_id <- function(url) {
+  # Remove the base URL part
+  id <- gsub("https://www.encodeproject.org/files/", "", url)
+  # Remove the download suffix part
+  id <- gsub("/@@download/.*", "", id)
+  return(id)
+}
+
+# Apply the function to the relevant column (assuming V1 contains URLs)
+if (nrow(combined_data) > 0 && ncol(combined_data) > 0) {
+  # Assuming the URL is in the first column, adjust if needed
+  colnames(combined_data)[1] <- "URL" # Give it a temporary name
+  ids <- sapply(combined_data$URL, extract_id)
+  combined_data$File.accession <- ids
+} else {
+  warning("Combined data is empty, cannot extract IDs.")
+}
+
+
+# --- Merging with Main Metadata ---
+# Merge the combined file list with the main metadata based on the extracted File.accession
+if (nrow(combined_data) > 0 && "File.accession" %in% colnames(combined_data) && nrow(metadata) > 0) {
+  merged_df <- merge(combined_data, metadata, by = "File.accession", all.x = TRUE) # Use all.x=TRUE to keep all files from combined_data
+  # Save the merged dataframe
+  write.csv(merged_df,"fullAnnotation.csv", row.names = FALSE)
+  print("Merged metadata saved to fullAnnotation.csv")
+} else {
+  warning("Cannot merge dataframes. Check if combined_data or metadata is empty or lacks 'File.accession'.")
+}
+
+# --- Processing JSON Metadata (Example) ---
+# This section seems to parse JSON data, potentially from an API or file
+# Replace 'file.choose()' with the actual path to your JSON file
+# scanMeta = jsonlite::fromJSON(file = file.choose())
+#
+# # Assuming scanMeta is a list of lists, where each inner list represents a record
+# df <- lapply(scanMeta, function(record) {
+#   # Convert each group to a data frame. Adjust ncol based on your JSON structure
+#   # This assumes a simple list structure; complex nested JSON needs different handling
+#   tryCatch({
+#     data.frame(matrix(unlist(record), ncol=6, byrow=TRUE)) # Example: assumes 6 elements per record
+#   }, error = function(e) {
+#     warning(paste("Error processing record:", e))
+#     NULL # Return NULL if a record causes an error
+#   })
+# })
+#
+# # Remove NULLs and combine into a single dataframe
+# df <- do.call(rbind, Filter(Negate(is.null), df))
+#
+# # Assign column names based on the JSON structure (example)
+# if (nrow(df) > 0 && length(scanMeta) > 0 && length(scanMeta[[1]]) > 0) {
+#   colnames(df) <- names(scanMeta[[1]][[1]]) # Assumes first record is representative
+# }
+# rownames(df) <- NULL
+# print("Processed JSON metadata:")
+# print(head(df))
+
+# --- Moving Files Based on Metadata (Example Utility Function) ---
+# Utility function to organize files into subfolders based on metadata criteria
+move_files_by_metadata <- function(metadata_file, files_dir, subfolder_name) {
+  # read the metadata file into a data frame
+  metadata <- read.csv(metadata_file)
+
+  # define the path for the subfolder
+  subfolder_path <- file.path(files_dir, subfolder_name)
+
+  # create the subfolder if it doesn't exist
+  if (!dir.exists(subfolder_path)) {
+    dir.create(subfolder_path)
+    print(paste("Created subfolder:", subfolder_path))
+  }
+
+  # iterate over the rows of the metadata data frame
+  for (i in 1:nrow(metadata)) {
+    # get the file name from the metadata (adjust column name if needed)
+    if ("file_name" %in% colnames(metadata)) {
+       file_name <- metadata$file_name[i]
+       source_path <- file.path(files_dir, file_name)
+       destination_path <- file.path(subfolder_path, file_name)
+
+       # Check if the source file exists before trying to move
+       if (file.exists(source_path)) {
+         # move the file to the subfolder
+         file.rename(from = source_path, to = destination_path)
+         print(paste("Moved", file_name, "to", subfolder_name))
+       } else {
+         warning(paste("Source file not found, cannot move:", source_path))
+       }
+    } else {
+       warning("Column 'file_name' not found in metadata.")
+       break # Exit loop if column is missing
+    }
+    # Example: Could also use other metadata columns like tissue_type, age
+    # tissue_type <- metadata$tissue_type[i]
+    # age <- metadata$age[i]
+  }
+}
+
+# Example usage (commented out):
+# move_files_by_metadata("fullAnnotation.csv", "/path/to/your/files", "organized_files")
+
+```
+
+### `wgbs_keys.txt`: WGBS Data File Accessions
+
+```R
+# --- wgbs_keys.txt ---
+# Purpose: Provides ENCODE file accession keys for Whole Genome Bisulfite Sequencing (WGBS) data.
+#          Likely used to download or reference specific datasets for the analysis.
+# Chapter Relevance: Appendix B (WGBS Data Sources) / Chapter 5 Setup
+
+# This file appears to be a list of keys, not executable R code.
+# It should be treated as a supplementary data file or included in documentation.
+
+# Example of how this data might be used in R (conceptual):
+# wgbs_metadata <- read.table("wgbs_keys.txt", header=TRUE, sep="\t") # Assuming TSV format
+# download_urls <- paste0("https://www.encodeproject.org/files/", wgbs_metadata$Accession, "/@@download/", wgbs_metadata$Accession, ".bam")
+# # Then use download.file() or similar to fetch the data
+
+# Content of wgbs_keys.txt (as text, not R code):
+# ===================================================
+## Hindbrain
+# e10.5_1 = "ENCFF598AIN"
+# e10.5_2 = "ENCFF660DOP" #
+# e11.5_1 = "ENCFF916YWD"
+# e11.5_2 = "ENCFF383DGQ" #
+# e12.5_1 = "ENCFF581VJD"
+# e12.5_2 = "ENCFF733JRP" #
+# e13.5_1 = "ENCFF937FOZ"
+# e13.5_2 = "ENCFF214QNV" #
+# e14.5_1 = "ENCFF898FOZ"
+# e14.5_2 = "ENCFF560BSG" #
+# e15.5_1 = "ENCFF092LFB"
+# e15.5_2 = "ENCFF362QAG" #
+# e16.5_1 = "ENCFF351UKS"
+# e16.5_2 = "ENCFF631OBM" #
+# p0_1 = "ENCFF105ZHG"
+# p0_2 = "ENCFF696JYQ" #
+## Midbrain
+# e10.5_1 = "ENCFF192LFV"
+# e10.5_2 = "ENCFF724ZCI" #
+# e11.5_1 = "ENCFF943IBD"
+# e11.5_2 = "ENCFF580ZKC" #
+# e12.5_1 = "ENCFF910CHR"
+# e12.5_2 = "ENCFF147HUB" #
+# e13.5_1 = "ENCFF376OQK"
+# e13.5_2 = "ENCFF323DLV" #
+# e14.5_1 = "ENCFF496WRJ"
+# e14.5_2 = "ENCFF499EUN" #
+# e15.5_1 = "ENCFF354OEF"
+# e15.5_2 = "ENCFF678MHU" #
+# e16.5_1 = "ENCFF451ZEE"
+# e16.5_2 = "ENCFF529OUU" #
+# p0_1 = "ENCFF415LLK"
+# p0_2 = "ENCFF733TCH" #
+## Forebrain
+# e10.5_1 = "ENCFF288JMC"
+# e10.5_2 = "ENCFF461PTM" #
+# e11.5_1 = "ENCFF890XTY"
+# e11.5_2 = "ENCFF232QBX" #
+# e12.5_1 = "ENCFF535JWX"
+# e12.5_2 = "ENCFF667LWJ" #
+# e13.5_1 = "ENCFF673PJA"
+# e13.5_2 = "ENCFF320IBB" #
+# e14.5_1 = "ENCFF667IZN"
+# e14.5_2 = "ENCFF948AII" #
+# e15.5_1 = "ENCFF331SNN"
+# e15.5_2 = "ENCFF566THP" #
+# e16.5_1 = "ENCFF457SPJ"
+# e16.5_2 = "ENCFF480MYA" #
+# p0_1 = "ENCFF486VKI"
+# p0_2 = "ENCFF784IJC" #
+# ===================================================
+```
+
+---
+
+## Chapter 4: Dynamic Alternative Splicing
+
+This chapter analyzes DTU events, isoform expression patterns, temporal dynamics, classification, and functional implications, likely using RNA-seq data.
+
+### `isoform_stats.txt`: Isoform and Gene-level Splice Event Correlation
+
+```R
+# --- isoform_stats.txt ---
+# Purpose: Calculates and compares correlations between different alternative splicing
+#          event types (e.g., ES, IR, A3, A5) at both the isoform and gene levels.
+#          Helps understand co-occurrence or mutual exclusivity of splicing events.
+# Chapter Relevance: 4.4 Isoform Expression and Distribution / 4.6 Classification and Combinatorial Analysis
+
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reshape2) # For melt function
+library(patchwork) # For combining plots
+library(xtable) # For creating LaTeX tables
+library(kableExtra) # For formatting tables
+library(stats) # For cor function
+
+# --- Function Definitions ---
+
+# Function to calculate p-value for correlation
+# Inputs: r = correlation coefficient, n = sample size
+# Output: p-value
+cor_to_p <- function(r, n) {
+  if (is.na(r) || abs(r) == 1 || n <= 2) {
+    return(NA_real_) # Return NA if correlation is undefined or sample size is too small
+  }
+  t_stat <- (r * sqrt(n - 2)) / sqrt(1 - r^2)
+  p_val <- 2 * pt(abs(t_stat), df = n - 2, lower.tail = FALSE)
+  return(p_val)
+}
+
+# Function to process splicing data for a brain region
+# Inputs: splicing_data = data frame with isoform_id and binary columns for splice events
+#         gene_data = data frame mapping isoform_id to gene_id
+# Output: list containing isoform correlation matrix, gene correlation matrix,
+#         available splice types, number of genes, and number of isoforms
+process_brain_region <- function(splicing_data, gene_data) {
+  # Define standard splicing types
+  splicing_types <- c("ES", "MEE", "MES", "IR", "A5", "A3", "ATSS", "ATTS")
+
+  # Identify splicing types actually present in the data
+  available_types <- intersect(splicing_types, colnames(splicing_data))
+  if(length(available_types) == 0) {
+    stop("None of the expected splicing type columns are present in the input splicing_data.")
+  }
+  print(paste("Available splicing types:", paste(available_types, collapse=", ")))
+
+  # --- Isoform-wise analysis ---
+  # Ensure data is numeric
+  isoform_matrix <- sapply(splicing_data[, available_types], as.numeric)
+  rownames(isoform_matrix) <- splicing_data$isoform_id # Keep track of isoforms
+
+  # Handle potential NAs introduced by as.numeric coercion (though unlikely for 0/1 data)
+  isoform_matrix[is.na(isoform_matrix)] <- 0
+
+  # Calculate isoform correlation matrix
+  print("Calculating isoform correlation matrix...")
+  isoform_cor <- cor(isoform_matrix, use = "pairwise.complete.obs")
+  n_isoforms <- nrow(isoform_matrix)
+  print(paste("Isoform correlation matrix calculated for", n_isoforms, "isoforms."))
+
+  # --- Gene-wise analysis ---
+  print("Performing gene-wise analysis...")
+  # Ensure gene_data has the necessary columns
+  if (!all(c("isoform_id", "gene_id") %in% colnames(gene_data))) {
+      stop("gene_data must contain 'isoform_id' and 'gene_id' columns.")
+  }
+  # Ensure splicing_data has 'isoform_id'
+  if (!"isoform_id" %in% colnames(splicing_data)) {
+      stop("splicing_data must contain 'isoform_id' column.")
+  }
+
+  # Merge splicing data with gene mapping
+  gene_splicing <- merge(splicing_data[, c("isoform_id", available_types)],
+                         gene_data[, c("isoform_id", "gene_id")],
+                         by = "isoform_id")
+
+  # Aggregate splicing events at the gene level (presence/absence: 1 if any isoform has it)
+  gene_matrix_df <- gene_splicing %>%
+    group_by(gene_id) %>%
+    summarise(across(all_of(available_types), ~as.numeric(any(. > 0, na.rm = TRUE))), .groups = "drop")
+
+  # Convert to matrix for correlation
+  gene_matrix <- as.matrix(gene_matrix_df[, -1]) # Exclude gene_id column
+  rownames(gene_matrix) <- gene_matrix_df$gene_id
+
+  # Calculate gene correlation matrix
+  print("Calculating gene correlation matrix...")
+  gene_cor <- cor(gene_matrix, use = "pairwise.complete.obs")
+  n_genes <- nrow(gene_matrix)
+  print(paste("Gene correlation matrix calculated for", n_genes, "genes."))
+
+  return(list(isoform_cor = isoform_cor, gene_cor = gene_cor,
+              available_types = available_types,
+              n_genes = n_genes, n_isoforms = n_isoforms))
+}
+
+
+# Function to calculate statistics (Mean, SD, CV, p-value, FDR) for correlations
+# Inputs: forebrain, hindbrain, midbrain = results from process_brain_region
+#         cor_type = "gene" or "isoform"
+# Output: data frame with summary statistics for each pair of splice types
+calculate_stats <- function(forebrain, hindbrain, midbrain, cor_type) {
+  # Select the appropriate correlation matrix and sample size
+  if(cor_type == "gene") {
+    fb_cor <- forebrain$gene_cor
+    hb_cor <- hindbrain$gene_cor
+    mb_cor <- midbrain$gene_cor
+    # Use the minimum sample size across tissues for conservative p-value calculation
+    n <- min(forebrain$n_genes, hindbrain$n_genes, midbrain$n_genes)
+  } else {
+    fb_cor <- forebrain$isoform_cor
+    hb_cor <- hindbrain$isoform_cor
+    mb_cor <- midbrain$isoform_cor
+    n <- min(forebrain$n_isoforms, hindbrain$n_isoforms, midbrain$n_isoforms)
+  }
+  available_types <- forebrain$available_types # Assume types are the same across regions
+
+  # Get all unique pairs of splice types
+  all_pairs <- expand.grid(row = available_types, col = available_types, stringsAsFactors = FALSE)
+  # Keep only pairs where row < col alphabetically to avoid duplicates and self-correlations
+  all_pairs <- all_pairs[as.character(all_pairs$row) < as.character(all_pairs$col), ]
+
+  # Calculate statistics for each pair
+  stats <- all_pairs %>%
+    rowwise() %>% # Process row by row
+    mutate(
+      Pair = paste(row, col, sep = "-"),
+      Forebrain = fb_cor[row, col],
+      Hindbrain = hb_cor[row, col],
+      Midbrain = mb_cor[row, col],
+      Mean = mean(c(Forebrain, Hindbrain, Midbrain), na.rm = TRUE),
+      SD = sd(c(Forebrain, Hindbrain, Midbrain), na.rm = TRUE),
+      CV = ifelse(abs(Mean) > 1e-6, (SD / abs(Mean)) * 100, NA), # Avoid division by zero
+      # Calculate p-value based on the mean correlation and minimum sample size
+      p_value = cor_to_p(Mean, n)
+    ) %>%
+    ungroup() # End rowwise processing
+
+  # Select and order columns
+  stats <- stats[, c("Pair", "Mean", "SD", "CV", "p_value")]
+  stats <- stats[order(stats$p_value, -abs(stats$Mean)), ] # Order by p-value, then by magnitude of correlation
+
+  # Calculate FDR adjusted p-value
+  stats$FDR <- p.adjust(stats$p_value, method = "BH")
+
+  # Assign significance levels based on FDR
+  stats$Significance <- cut(stats$FDR,
+                            breaks = c(-Inf, 0.001, 0.01, 0.05, Inf), # Use -Inf for lower bound
+                            labels = c("***", "**", "*", "ns"),
+                            include.lowest = TRUE, right = FALSE) # Intervals are [low, high)
+
+  return(stats)
+}
+
+
+# Function to create heatmap with significance levels
+# Inputs: stats_data = output from calculate_stats
+# Output: ggplot object
+create_heatmap_with_significance <- function(stats_data, title) {
+  # Reshape the data for the heatmap
+  # Separate Pair column into Type1 and Type2
+  heatmap_data <- stats_data %>%
+    separate(Pair, into = c("Type1", "Type2"), sep = "-", remove = FALSE) # Keep Pair column
+
+  # Create a symmetric matrix for plotting
+  all_types <- sort(unique(c(heatmap_data$Type1, heatmap_data$Type2)))
+  heatmap_matrix <- matrix(NA, nrow = length(all_types), ncol = length(all_types),
+                           dimnames = list(all_types, all_types))
+
+  # Fill the matrix with Mean correlation values
+  for (i in 1:nrow(heatmap_data)) {
+    heatmap_matrix[heatmap_data$Type1[i], heatmap_data$Type2[i]] <- heatmap_data$Mean[i]
+    heatmap_matrix[heatmap_data$Type2[i], heatmap_data$Type1[i]] <- heatmap_data$Mean[i]
+  }
+  diag(heatmap_matrix) <- 1 # Set diagonal to 1 (self-correlation)
+
+  # Melt the matrix for ggplot
+  melted_matrix <- melt(heatmap_matrix, na.rm = FALSE) # Keep NAs for diagonal
+  colnames(melted_matrix) <- c("Type1", "Type2", "Correlation")
+
+  # Add significance levels back to the melted data
+  # Need to match pairs in both directions (e.g., A-B and B-A)
+  stats_data_sym <- stats_data %>%
+    select(Pair, Significance) %>%
+    separate(Pair, into = c("T1", "T2"), sep="-") %>%
+    bind_rows(., rename(., T1 = T2, T2 = T1)) # Add symmetric pairs
+
+  melted_matrix <- melted_matrix %>%
+    left_join(stats_data_sym, by = c("Type1" = "T1", "Type2" = "T2")) %>%
+    # Set significance for diagonal to empty string
+    mutate(Significance = ifelse(Type1 == Type2, "", as.character(Significance)))
+
+  # Create the heatmap plot
+  ggplot(melted_matrix, aes(x = Type1, y = Type2, fill = Correlation)) +
+    geom_tile(color = "grey80") + # Add tile borders
+    # Add text for correlation value and significance level
+    geom_text(aes(label = ifelse(Type1 != Type2 & !is.na(Correlation),
+                                 paste(sprintf("%.2f", Correlation), Significance, sep = "\n"),
+                                 "1.00")), # Show 1.00 on diagonal
+              size = 3, color = "black") +
+    # Use a diverging color scale
+    scale_fill_gradient2(low = "#313695", high = "#A50026", mid = "#FFFFBF", # Blue-White-Red
+                         midpoint = 0, limit = c(-1, 1), space = "Lab",
+                         name="Mean Correlation") +
+    theme_minimal(base_size = 10) + # Adjust base font size
+    # Improve axis labels and theme
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size=9),
+          axis.text.y = element_text(size=9),
+          axis.title = element_blank(),
+          plot.title = element_text(hjust = 0.5, face="bold"),
+          plot.subtitle = element_text(hjust = 0.5, size=9),
+          panel.grid.major = element_blank(), # Remove grid lines
+          panel.border = element_blank(),
+          legend.position = "right") +
+    coord_fixed() + # Ensure square tiles
+    labs(title = title,
+         subtitle = "*** FDR < 0.001, ** FDR < 0.01, * FDR < 0.05, ns: not significant")
+}
+
+# --- Execution ---
+
+# Load necessary data (replace with your actual loading code)
+# combinedForebrain, combinedHindBrain, combinedMidBrain should be lists
+# containing at least $AlternativeSplicingAnalysis (dataframe) and $exons (dataframe or GRanges)
+
+# Process each brain region
+result_forebrain <- process_brain_region(combinedForebrain$AlternativeSplicingAnalysis, combinedForebrain$exons)
+result_hindbrain <- process_brain_region(combinedHindBrain$AlternativeSplicingAnalysis, combinedHindBrain$exons)
+result_midbrain <- process_brain_region(combinedMidBrain$AlternativeSplicingAnalysis, combinedMidBrain$exons)
+
+# Calculate gene-wise and isoform-wise statistics
+gene_stats <- calculate_stats(result_forebrain, result_hindbrain, result_midbrain, "gene")
+isoform_stats <- calculate_stats(result_forebrain, result_hindbrain, result_midbrain, "isoform")
+
+# Print the stats tables
+print("Gene-wise Statistics:")
+print(gene_stats)
+print("Isoform-wise Statistics:")
+print(isoform_stats)
+
+# Save stats tables to CSV
+write.csv(isoform_stats, 'isoform_wise_splicing_stats.csv', row.names = FALSE)
+write.csv(gene_stats, 'gene_wise_splicing_stats.csv', row.names = FALSE)
+
+# Create the heatmaps
+gene_heatmap <- create_heatmap_with_significance(gene_stats, "Gene-wise Splicing Type Correlations")
+isoform_heatmap <- create_heatmap_with_significance(isoform_stats, "Isoform-wise Splicing Type Correlations")
+
+# Save the heatmaps
+ggsave("gene_wise_correlation_heatmap_significance.pdf", gene_heatmap, width = 8, height = 7)
+ggsave("isoform_wise_correlation_heatmap_significance.pdf", isoform_heatmap, width = 8, height = 7)
+
+# Display the plots
+print(gene_heatmap)
+print(isoform_heatmap)
+
+# --- Create formatted tables for output ---
+# Function to format tables using kableExtra
+format_kable_table <- function(stats_data, caption) {
+  stats_data %>%
+    mutate(
+      Mean = cell_spec(sprintf("%.3f", Mean),
+                       color = case_when(
+                           Mean > 0.5 ~ "darkgreen",
+                           Mean < -0.5 ~ "darkred",
+                           Mean > 0.2 ~ "green",
+                           Mean < -0.2 ~ "red",
+                           TRUE ~ "black" # Default color
+                           ),
+                       bold = ifelse(Significance != "ns", TRUE, FALSE)),
+      SD = sprintf("%.3f", SD),
+      CV = sprintf("%.3f", CV),
+      p_value = sprintf("%.2e", p_value),
+      FDR = sprintf("%.2e", FDR),
+      Significance = cell_spec(Significance,
+                               color = case_when(
+                                   Significance == "***" ~ "#A50026", # Dark Red
+                                   Significance == "**" ~ "#F46D43", # Orange-Red
+                                   Significance == "*" ~ "#FDAE61", # Light Orange
+                                   TRUE ~ "#66BD63" # Green for ns (or choose grey)
+                                   ),
+                               bold = TRUE)
+    ) %>%
+    kbl(escape = FALSE, caption = caption, booktabs = TRUE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE, font_size = 10) %>%
+    column_spec(1, bold = TRUE) # Make Pair column bold
+}
+
+# Create formatted tables
+kable_gene_stats <- format_kable_table(gene_stats, "Gene Aggregated Splicing Statistics")
+kable_isoform_stats <- format_kable_table(isoform_stats, "Isoform Splicing Statistics")
+
+# Print or save the kable tables (saving requires webshot package)
+print(kable_gene_stats)
+# save_kable(kable_gene_stats, "gene_stats_table.pdf")
+print(kable_isoform_stats)
+# save_kable(kable_isoform_stats, "isoform_stats_table.pdf")
+
+```
+
+### `pearson_corr.txt`: Pearson Correlation Plot (for Splicing Events)
+
+```R
+# --- pearson_corr.txt ---
+# Purpose: Calculates and visualizes the Pearson correlation matrix between
+#          different *aggregated* feature groups derived from proteochemometrics (PCM).
+#          In the context of Chapter 4, this was likely adapted or initially used
+#          to visualize correlations *between splicing event types* rather than PCM features.
+# Chapter Relevance: 4.4 Isoform Expression and Distribution (if used for splice events)
+#                    or Appendix B (if showing PCM correlations related to isoforms)
+
+# Load necessary libraries
+library(corrplot)
+library(RColorBrewer) # For color palettes
+
+# --- Correlation Matrix Definition ---
+# Define the correlation matrix.
+# NOTE: The values provided seem to relate to PCM features (CTDT, SOCN, QSO etc.)
+#       which might belong to Chapter 3 (nORF analysis). If this script was used
+#       for Chapter 4, the matrix values and labels should reflect splicing events
+#       (ES, IR, A3, A5, ATSS, ATTS, MEE, MES).
+#       Assuming the provided matrix IS for splicing types for Chapter 4 context:
+#       Replace labels and potentially values with actual splicing event correlations.
+
+# Example using *placeholder* labels for Splicing Events and original values:
+splicing_event_labels <- c("Autocorrelation", "Triads", "AAC", "DC", "CTDC", "CTDT", "CTDD", "SOCN", "QSO", "PAAC", "APAAC") # REPLACE with ES, IR, etc.
+
+# Original correlation matrix values provided:
+cor_matrix_values <- matrix(c(
+   1.00, -0.20,  0.01, -0.01,  0.01, -0.19, -0.09, -0.05,  0.17, -0.02, -0.04,
+  -0.20,  1.00, -0.05, -0.02, -0.08,  0.25,  0.57,  0.54, -0.61,  0.51,  0.52,
+   0.01, -0.05,  1.00,  0.02,  0.02,  0.01, -0.05,  0.03,  0.06, -0.03, -0.03,
+  -0.01, -0.02,  0.02,  1.00, -0.01,  0.00, -0.03,  0.03, -0.03, -0.03, -0.03,
+   0.01, -0.08,  0.02, -0.01,  1.00,  0.04, -0.06, -0.04,  0.05, -0.04, -0.04,
+  -0.19,  0.25,  0.01,  0.00,  0.04,  1.00,  0.19,  0.09, -0.02,  0.07,  0.08,
+  -0.09,  0.57, -0.05, -0.03, -0.06,  0.19,  1.00,  0.31, -0.44,  0.31,  0.30,
+  -0.05,  0.54,  0.03,  0.03, -0.04,  0.09,  0.31,  1.00, -0.34,  0.99,  1.00, # Note: SOCN, PAAC, APAAC highly correlated (0.99-1.00)
+   0.17, -0.61,  0.06, -0.03,  0.05, -0.02, -0.44, -0.34,  1.00, -0.32, -0.33,
+  -0.02,  0.51, -0.03, -0.03, -0.04,  0.07,  0.31,  0.99, -0.32,  1.00,  0.99,
+  -0.04,  0.52, -0.03, -0.03, -0.04,  0.08,  0.30,  1.00, -0.33,  0.99,  1.00
+), nrow = 11, byrow = TRUE)
+
+# Assign row and column names using the placeholder labels
+rownames(cor_matrix_values) <- colnames(cor_matrix_values) <- splicing_event_labels
+
+# --- Plotting the Correlation Matrix ---
+# Define a color palette
+col_palette <- colorRampPalette(brewer.pal(11, "RdBu"))(200) # Diverging palette
+
+# Plot the correlation matrix using corrplot
+corrplot(cor_matrix_values,
+         method = "color",       # Use color intensity to represent correlation
+         type = "upper",         # Show only the upper triangle
+         order = "hclust",       # Reorder based on hierarchical clustering
+         addCoef.col = "black",  # Add correlation coefficients in black text
+         tl.col = "black",       # Color of text labels
+         tl.srt = 45,            # Rotate text labels
+         diag = FALSE,           # Do not display diagonal
+         col = rev(col_palette), # Use the defined color palette
+         cl.lim = c(-1, 1),      # Set color limits from -1 to 1
+         number.cex = 0.7,       # Size of correlation coefficient text
+         title = "Correlation Between Splicing Event Types", # Add a title
+         mar=c(0,0,1,0))         # Adjust margins
+
+```
+
+### `protr_isoforms.txt`: Proteochemometric Analysis of Isoforms
+
+```R
+# --- protr_isoforms.txt ---
+# Purpose: Performs proteochemometric (PCM) analysis on amino acid sequences
+#          of isoforms, likely to identify sequence features associated with
+#          different splicing outcomes or functional consequences. Uses ProtR package.
+#          Also includes t-SNE visualization and preparation for XGBoost classification.
+# Chapter Relevance: Appendix B.3 (Proteochemometrical Signatures of Isoform Splicing)
+
+# Load required libraries
+library(Biostrings) # For handling AAStringSet
+library(ProtR)      # For PCM analysis (if installed)
+library(Rtsne)      # For t-SNE visualization
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(caret)      # For data partitioning and potentially ML model evaluation
+library(xgboost)    # For classification model
+
+# --- Data Preparation ---
+
+# Function to convert AAStringSet to a data frame
+convert_to_dataframe <- function(aa_string_set) {
+  if (!is(aa_string_set, "AAStringSet")) {
+    stop("Input must be an AAStringSet object.")
+  }
+  sequences <- as.character(aa_string_set)
+  isoform_ids <- names(aa_string_set)
+  if (is.null(isoform_ids)) {
+     warning("Names attribute is NULL, using sequential IDs.")
+     isoform_ids <- paste0("Seq_", seq_along(sequences))
+  }
+  df <- data.frame(AA_Sequence = sequences, Isoform_ID = isoform_ids, stringsAsFactors = FALSE)
+  return(df)
+}
+
+# Example: Load AA sequences (replace with your actual loading code)
+# aa_df <- convert_to_dataframe(combinedForebrain$aaSequence)
+# aa_df2 <- convert_to_dataframe(combinedHindBrain$aaSequence)
+# aa_df3 <- convert_to_dataframe(combinedMidBrain$aaSequence)
+#
+# aa_combined = rbind(aa_df, aa_df2, aa_df3)
+# aa = distinct(aa_combined) # Ensure unique sequences if needed
+
+# --- Proteochemometric Feature Extraction ---
+# Use ProtR's extractPCM functions or similar (example uses a placeholder 'pchemAnalysis')
+# This function would calculate features like AAC, DPC, CTD, QSO, PAAC, APAAC etc.
+# Replace 'pchemAnalysis' with the actual ProtR function calls or your custom implementation.
+# DTUs <- pchemAnalysis(aa$AA_Sequence, "DTUs") # Placeholder function
+# DTUs$id <- aa$Isoform_ID                     # Add isoform IDs back
+
+# Example using ProtR (uncomment and adapt if ProtR is installed):
+# library(ProtR)
+# aac <- extractPCMDesc(aa$AA_Sequence, type = "AAC") # Amino Acid Composition
+# dpc <- extractPCMDesc(aa$AA_Sequence, type = "DPC") # Dipeptide Composition
+# ctd <- extractPCMDesc(aa$AA_Sequence, type = "CTD") # Composition/Transition/Distribution
+# DTUs <- cbind(aac, dpc[,-1], ctd[,-1]) # Combine features (adjust based on ProtR output)
+# DTUs$id <- aa$Isoform_ID
+
+# --- Data Cleaning for t-SNE and XGBoost ---
+# Assuming 'DTUs' is the data frame with PCM features and an 'id' column
+
+validDTUS <- DTUs # Use a copy
+
+# Function to clean data: convert to numeric, handle NAs, remove low-variance columns
+clean_pcm_data <- function(df, id_col = "id", na_threshold = 0.5, var_threshold = 1e-5) {
+  id_index <- which(names(df) == id_col)
+  ids <- df[[id_col]]
+  numeric_df <- df[, -id_index]
+
+  # Convert columns to numeric, coercing errors to NA
+  numeric_df <- data.frame(lapply(numeric_df, function(x) {
+    suppressWarnings(as.numeric(as.character(x)))
+  }))
+
+  # Check for NAs introduced
+  na_counts_initial <- colSums(is.na(numeric_df))
+  print("Initial NA counts per column:")
+  print(na_counts_initial[na_counts_initial > 0])
+
+  # Remove columns with too many NAs
+  na_proportion <- colMeans(is.na(numeric_df))
+  cols_to_keep_na <- which(na_proportion < na_threshold)
+  numeric_df <- numeric_df[, cols_to_keep_na]
+  cat("Dimensions after removing high-NA columns:", dim(numeric_df), "\n")
+
+  # Remove rows with any remaining NAs
+  complete_rows <- complete.cases(numeric_df)
+  numeric_df <- numeric_df[complete_rows, ]
+  ids_clean <- ids[complete_rows]
+  cat("Dimensions after removing rows with NAs:", dim(numeric_df), "\n")
+
+  # Remove zero-variance or near-zero-variance columns
+  variances <- apply(numeric_df, 2, var, na.rm = TRUE)
+  cols_to_keep_var <- which(variances > var_threshold)
+  numeric_df <- numeric_df[, cols_to_keep_var]
+  cat("Dimensions after removing low-variance columns:", dim(numeric_df), "\n")
+
+  # Combine ID back
+  final_df <- cbind(data.frame(id = ids_clean), numeric_df)
+  return(final_df)
+}
+
+# Clean the data
+validDTUS_clean <- clean_pcm_data(validDTUS)
+
+# --- t-SNE Visualization ---
+if (nrow(validDTUS_clean) > 1) {
+    metadata_tsne <- validDTUS_clean[, "id", drop=FALSE] # Keep metadata
+    dtu_matrix_tsne <- as.matrix(validDTUS_clean[, -which(names(validDTUS_clean) == "id")])
+
+    # Check for remaining NAs before running t-SNE
+    if (any(is.na(dtu_matrix_tsne))) {
+      warning("NA values remain in the matrix for t-SNE. Check cleaning steps.")
+    } else {
+        # Run t-SNE
+        set.seed(42) # for reproducibility
+        tsne_out <- Rtsne(dtu_matrix_tsne,
+                          check_duplicates = FALSE,
+                          pca = TRUE,           # Perform initial PCA (recommended)
+                          pca_center = TRUE,
+                          pca_scale = TRUE,
+                          perplexity = 30,    # Typical perplexity value
+                          max_iter = 1000,      # Number of iterations
+                          verbose = TRUE)
+
+        # Create t-SNE plot data frame
+        tsne_plot_df <- data.frame(x = tsne_out$Y[, 1],
+                                   y = tsne_out$Y[, 2],
+                                   id = metadata_tsne$id)
+        # Optional: Merge with other metadata if available (e.g., switch type)
+        # tsne_plot_df <- merge(tsne_plot_df, other_metadata, by="id")
+
+        # Plot t-SNE results
+        p_tsne <- ggplot(tsne_plot_df, aes(x = x, y = y)) +
+          geom_point(alpha = 0.6, size=1.5) + # Add color = some_factor if metadata available
+          theme_minimal() +
+          labs(title = "t-SNE Visualization of Isoform PCM Features", x = "t-SNE Dimension 1", y = "t-SNE Dimension 2")
+        print(p_tsne)
+        ggsave("isoform_pcm_tsne.pdf", p_tsne, width=8, height=7)
+
+        # --- Save for TensorBoard Projector ---
+        # Write vectors (embeddings)
+        write.table(dtu_matrix_tsne, "dtu_pcm_vectors_for_tensorboard.tsv", sep = "\t", col.names = FALSE, row.names = FALSE, quote = FALSE)
+        # Write metadata
+        write.table(metadata_tsne, "dtu_pcm_metadata_for_tensorboard.tsv", sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
+        print("Data saved for TensorBoard Projector.")
+    }
+} else {
+    print("Insufficient data remaining after cleaning for t-SNE.")
+}
+
+
+# --- Prepare for XGBoost Classification (Example based on switch type) ---
+
+# Merge with switch information (assuming 'combined_switch_info' is available)
+# The 'id' column in combined_switch_info should match the isoform ID format in validDTUS_clean
+if (exists("combined_switch_info")) {
+    data_for_xgb <- merge(validDTUS_clean, combined_switch_info, by = "id", all.x = TRUE)
+
+    # Filter out rows where switch info is missing or 'other'/'insufficient data'
+    data_for_xgb <- data_for_xgb %>%
+      filter(!is.na(combined_switches), !combined_switches %in% c("other", "insufficient data"))
+
+    if (nrow(data_for_xgb) > 10) { # Check if enough data remains
+        data_for_xgb$combined_switches <- as.factor(data_for_xgb$combined_switches)
+        data_for_xgb$id <- NULL # Remove ID column
+
+        # Convert to numeric matrix, excluding the target variable
+        target_col_index <- which(names(data_for_xgb) == "combined_switches")
+        xgb_matrix <- as.matrix(sapply(data_for_xgb[, -target_col_index], as.numeric))
+        xgb_labels <- as.numeric(data_for_xgb$combined_switches) - 1 # XGBoost expects 0-based labels
+
+        # Split data
+        set.seed(123)
+        train_index <- createDataPartition(xgb_labels, p = 0.8, list = FALSE)
+        train_matrix <- xgb.DMatrix(data = xgb_matrix[train_index,], label = xgb_labels[train_index])
+        test_matrix <- xgb.DMatrix(data = xgb_matrix[-train_index,], label = xgb_labels[-train_index])
+        num_classes <- length(levels(data_for_xgb$combined_switches))
+
+        # --- XGBoost Model Training (Example parameters) ---
+        params <- list(
+          booster = "gbtree",
+          eta = 0.1,
+          max_depth = 6,
+          objective = "multi:softprob",
+          num_class = num_classes,
+          eval_metric = "mlogloss"
+        )
+
+        xgb_model <- xgb.train(
+          params = params,
+          data = train_matrix,
+          nrounds = 100, # Number of boosting rounds
+          watchlist = list(train = train_matrix, test = test_matrix),
+          early_stopping_rounds = 10, # Stop if performance doesn't improve
+          verbose = 1
+        )
+
+        # --- Evaluate Model ---
+        # Predictions
+        preds_prob <- predict(xgb_model, test_matrix)
+        preds_matrix <- matrix(preds_prob, ncol = num_classes, byrow = TRUE)
+        preds_class <- max.col(preds_matrix) - 1 # Get predicted class index
+
+        # Confusion Matrix
+        actual_class <- xgb_labels[-train_index]
+        conf_mat <- confusionMatrix(factor(preds_class), factor(actual_class))
+        print("Confusion Matrix and Statistics:")
+        print(conf_mat)
+
+        # Feature Importance
+        importance <- xgb.importance(model = xgb_model)
+        print("Feature Importance:")
+        print(head(importance, 20)) # Print top 20 important features
+        xgb.plot.importance(importance, top_n = 20)
+
+    } else {
+        print("Insufficient data remaining after merging and filtering for XGBoost.")
+    }
+} else {
+    print("Combined switch info not available. Skipping XGBoost classification.")
+}
+```
+
+### `isoform_classification.txt`: Isoform Temporal Pattern Classification
+
+```R
+# --- isoform_classification.txt ---
+# Purpose: Classifies isoforms based on their temporal expression patterns across
+#          developmental timepoints. Calculates metrics like switching events,
+#          overall trend (increasing/decreasing), complex patterns (monotonic,
+#          biphasic, oscillatory), and replicate stability.
+# Chapter Relevance: 4.5 Temporal Analysis / 4.6 Classification and Combinatorial Analysis
+
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(zoo) # For rolling functions if needed, though not used in provided code
+library(ggplot2)
+library(patchwork)
+library(stats) # For lm, median, sd
+
+# --- Helper Function Definitions ---
+
+# Function to classify basic temporal pattern (switches, trend)
+# Input: row = numeric vector of mean expression values across timepoints
+# Output: character vector c(switch_pattern, trend_pattern)
+classify_isoform <- function(row) {
+  expr_values <- as.numeric(row)
+
+  # Handle cases with insufficient data or no expression
+  if (all(is.na(expr_values)) || length(na.omit(expr_values)) < 2 || all(na.omit(expr_values) == 0)) {
+    return(c("Insufficient data", "Unknown"))
+  }
+
+  # Remove NA values for calculations
+  valid_indices <- !is.na(expr_values)
+  expr_values_valid <- expr_values[valid_indices]
+  time_points_valid <- seq_along(expr_values)[valid_indices]
+
+  if (length(expr_values_valid) < 2) {
+     return(c("Insufficient data", "Unknown"))
+  }
+
+  # Calculate switching pattern based on crossing the median
+  median_expr <- median(expr_values_valid[expr_values_valid > 0]) # Use median of non-zero values
+  if (is.na(median_expr) || median_expr == 0) {
+      is_high <- expr_values_valid > 0 # If median is zero, any expression is "high"
+  } else {
+      is_high <- expr_values_valid > median_expr
+  }
+  # Count switches only where consecutive valid points exist
+  switches <- sum(abs(diff(as.numeric(is_high[diff(time_points_valid) == 1]))))
+
+  # Calculate overall trend using linear regression
+  trend_model <- lm(expr_values_valid ~ time_points_valid)
+  trend <- coef(trend_model)[2] # Get the slope
+
+  # Determine switch pattern description
+  if (switches > 0) {
+    switch_pattern <- paste0("Switch (", switches, " times)")
+  } else if (all(diff(expr_values_valid) >= -1e-9)) { # Allow for tiny floating point errors
+    switch_pattern <- "Monotonic increase" # Changed from Gradual
+  } else if (all(diff(expr_values_valid) <= 1e-9)) {
+    switch_pattern <- "Monotonic decrease" # Changed from Gradual
+  } else if (sd(expr_values_valid) < 1e-6) { # Check for near-constant expression
+    switch_pattern <- "Constitutive"
+  } else {
+    switch_pattern <- "Variable (Non-switch)" # More specific than just "Variable"
+  }
+
+  # Determine trend description
+  trend_pattern <- if (is.na(trend)) { "Unknown" }
+                   else if (trend > 0.01) { "Overall increasing" } # Added threshold
+                   else if (trend < -0.01) { "Overall decreasing" }
+                   else { "Overall stable" }
+
+  return(c(switch_pattern, trend_pattern))
+}
+
+# Function to classify complex patterns (monotonic, biphasic, oscillatory)
+# Input: row = numeric vector of mean expression values across timepoints
+# Output: character string classification
+classify_complex_pattern <- function(row) {
+  expr_values <- as.numeric(row)
+  valid_indices <- !is.na(expr_values)
+  expr_values_valid <- expr_values[valid_indices]
+  time_points_valid <- seq_along(expr_values)[valid_indices]
+
+  # Need at least 3 points to determine complex patterns
+  if (length(expr_values_valid) < 3) {
+    return("Insufficient data")
+  }
+
+  # Use smoothing spline to find extrema
+  fit <- try(smooth.spline(time_points_valid, expr_values_valid), silent = TRUE)
+  if (inherits(fit, "try-error")) {
+    # Fallback if spline fails (e.g., too few unique x values)
+    if (all(diff(expr_values_valid) >= -1e-9) || all(diff(expr_values_valid) <= 1e-9)) {
+        return("Monotonic")
+    } else {
+        return("Complex (Non-monotonic)") # Default complex classification
+    }
+  }
+
+  deriv <- predict(fit, time_points_valid, deriv = 1)
+  # Find where the sign of the derivative changes (extrema)
+  sign_changes <- diff(sign(deriv$y))
+  extrema_count <- sum(sign_changes != 0)
+
+  # Classify based on number of extrema
+  if (extrema_count >= 2) {
+    return("Oscillatory")
+  } else if (extrema_count == 1) {
+    return("Biphasic")
+  } else {
+    # Check if monotonic using original data if spline derivative is flat
+    if (all(diff(expr_values_valid) >= -1e-9) || all(diff(expr_values_valid) <= 1e-9)) {
+        return("Monotonic")
+    } else {
+        # If derivative has no sign change but original data isn't monotonic
+        # This can happen with noisy data or plateaus.
+        return("Complex (Non-monotonic)")
+    }
+  }
+}
+
+
+# Function to calculate replicate stability (Coefficient of Variation based)
+# Input: rep1, rep2 = expression values for two replicates at a single timepoint
+# Output: character string stability category
+calculate_replicate_stability <- function(rep1, rep2) {
+  values <- c(rep1, rep2)
+  # Remove NAs before calculation
+  values_valid <- na.omit(values)
+
+  # Handle cases with insufficient data
+  if (length(values_valid) < 2) return(NA_character_)
+
+  mean_val <- mean(values_valid)
+  sd_val <- sd(values_valid)
+
+  # Avoid division by zero or near-zero mean
+  if (is.na(mean_val) || abs(mean_val) < 1e-6) return(NA_character_)
+
+  cv <- sd_val / mean_val
+  if (is.na(cv)) return(NA_character_)
+
+  # Classify stability based on CV thresholds
+  if (cv < 0.1) return("High")
+  if (cv < 0.25) return("Medium") # Threshold from original code seems reasonable
+  return("Low")
+}
+
+
+# --- Main Processing Function ---
+# Processes expression data for one tissue, calculates classifications and stability
+# Inputs: data = data frame with isoform expression (e.g., combinedHindBrain$isoformRepExpression)
+#         tissue_name = character string for the tissue
+# Output: data frame with classifications and stability added
+process_tissue_data <- function(data, tissue_name) {
+  print(paste("Processing data for:", tissue_name))
+  if (!"isoform_id" %in% colnames(data)) {
+    colnames(data)[1] <- "isoform_id" # Assume first column is ID if not named
+  }
+
+  # Reshape to long format
+  data_long <- data %>%
+    pivot_longer(cols = -isoform_id,
+                 names_to = c("timepoint", "replicate"),
+                 names_pattern = "(.+)_(.+)", # Assumes format like "10.5_1"
+                 values_to = "expression")
+
+  # Calculate mean expression and replicate stability per isoform/timepoint
+  data_processed <- data_long %>%
+    group_by(isoform_id, timepoint) %>%
+    summarise(
+      mean_expression = mean(expression, na.rm = TRUE),
+      # Calculate stability only if both replicates exist
+      replicate_stability = if(n() == 2 && !any(is.na(expression))) {
+                              calculate_replicate_stability(expression[replicate == "1"], expression[replicate == "2"])
+                            } else { NA_character_ },
+      .groups = "drop" # Drop grouping after summarise
+    )
+
+  # Reshape mean expression back to wide format for classification
+  data_wide <- data_processed %>%
+    dplyr::select(isoform_id, timepoint, mean_expression) %>%
+    pivot_wider(names_from = timepoint, values_from = mean_expression)
+
+  # Apply classifications to the mean expression data
+  # Ensure columns exist before applying functions
+  if (ncol(data_wide) > 1) {
+      temporal_classifications <- t(apply(data_wide[,-1], 1, classify_isoform))
+      colnames(temporal_classifications) <- c("Temporal_Classification", "Trend_Classification")
+
+      data_wide$Temporal_Classification <- temporal_classifications[,1]
+      data_wide$Trend_Classification <- temporal_classifications[,2]
+      data_wide$Complex_Classification <- apply(data_wide[,-1], 1, classify_complex_pattern)
+      # Calculate switch count from Temporal_Classification
+      data_wide$Switch_Count <- sapply(data_wide$Temporal_Classification, function(x) {
+                                       if (grepl("Switch", x)) {
+                                         as.integer(regmatches(x, regexpr("\\d+", x)))
+                                       } else { 0 } # Assign 0 if not a switch pattern
+                                     })
+  } else {
+      # Handle case where there's only the isoform_id column
+      data_wide$Temporal_Classification <- "Insufficient data"
+      data_wide$Trend_Classification <- "Unknown"
+      data_wide$Complex_Classification <- "Insufficient data"
+      data_wide$Switch_Count <- 0
+  }
+
+
+  # Merge classifications back with replicate stability (long format)
+  final_data <- data_wide %>%
+    pivot_longer(cols = -c(isoform_id, Temporal_Classification, Trend_Classification, Complex_Classification, Switch_Count),
+                 names_to = "timepoint",
+                 values_to = "mean_expression") %>%
+    left_join(data_processed %>% dplyr::select(isoform_id, timepoint, replicate_stability),
+              by = c("isoform_id", "timepoint"))
+
+  final_data$tissue <- tissue_name # Add tissue identifier
+  return(final_data)
+}
+
+
+# --- Execution and Visualization ---
+
+# Process data for each tissue
+# Replace with your actual data objects
+# hindbrain_data_classified <- process_tissue_data(combinedHindBrain$isoformRepExpression, "Hindbrain")
+# forebrain_data_classified <- process_tissue_data(combinedForebrain$isoformRepExpression, "Forebrain")
+# midbrain_data_classified <- process_tissue_data(combinedMidBrain$isoformRepExpression, "Midbrain")
+
+# Combine all classified tissue data
+# all_tissue_data_classified <- bind_rows(hindbrain_data_classified, forebrain_data_classified, midbrain_data_classified)
+
+# --- Visualization Functions ---
+# Function to create a bar plot for categorical variables, faceted by tissue
+create_faceted_bar_plot <- function(data, variable, title, angle = 45) {
+  # Calculate counts within each tissue
+  plot_data <- data %>%
+      filter(!is.na({{variable}})) %>% # Remove NAs for the specific variable
+      count(tissue, {{variable}}) %>%
+      group_by(tissue) %>%
+      mutate(proportion = n / sum(n)) # Calculate proportion within tissue
+
+  ggplot(plot_data, aes(x = reorder({{variable}}, -n), y = n, fill = tissue)) +
+    geom_bar(stat = "identity", color = "grey40", size=0.2) + # Add bar borders
+    facet_wrap(~tissue, scales = "free_x") + # Facet by tissue
+    theme_minimal(base_size = 9) +
+    theme(axis.text.x = element_text(angle = angle, hjust = 1, size=7),
+          legend.position = "none", # Remove legend as fill is redundant with facet
+          strip.text = element_text(face="bold")) +
+    labs(title = title, x = NULL, y = "Count") +
+    scale_fill_brewer(palette = "Pastel1") # Use a consistent palette
+}
+
+# Function to create a histogram for Switch_Count, faceted by tissue
+create_faceted_histogram <- function(data, variable, title, binwidth = 1) {
+   ggplot(data, aes(x = {{variable}}, fill = tissue)) +
+    geom_histogram(binwidth = binwidth, color = "grey40", size=0.2, position="identity") + # Use identity position
+    facet_wrap(~tissue, scales = "free_y") + # Facet by tissue
+    theme_minimal(base_size = 9) +
+    labs(title = title, x = "Number of Switches", y = "Count") +
+    scale_fill_brewer(palette = "Pastel1") +
+    theme(legend.position = "none", strip.text = element_text(face="bold"))
+}
+
+# --- Generate Plots (using the classified data 'all_tissue_data_classified') ---
+# p1_facet <- create_faceted_bar_plot(all_tissue_data_classified, Temporal_Classification, "Temporal Classifications by Tissue")
+# p2_facet <- create_faceted_bar_plot(all_tissue_data_classified, Trend_Classification, "Trend Classifications by Tissue", angle=0)
+# p3_facet <- create_faceted_bar_plot(all_tissue_data_classified, Complex_Classification, "Complex Classifications by Tissue")
+# p4_facet <- create_faceted_histogram(all_tissue_data_classified, Switch_Count, "Switch Counts by Tissue")
+# p5_facet <- create_faceted_bar_plot(all_tissue_data_classified, replicate_stability, "Replicate Stability by Tissue", angle=0)
+#
+# # Compare stability across tissues
+# stability_comparison_classified <- compare_stability(all_tissue_data_classified) # Use function defined previously
+# p6_stability <- ggplot(stability_comparison_classified, aes(x = stability_comparison)) +
+#   geom_bar(fill = "skyblue", color = "darkblue") +
+#   theme_minimal(base_size = 9) +
+#   labs(title = "Cross-tissue Stability Comparison", x = "Stability Category", y = "Count")
+#
+# # Combine plots using patchwork
+# combined_faceted_plot <- (p1_facet | p2_facet) / (p3_facet | p4_facet) / (p5_facet | p6_stability) +
+#                             plot_annotation(title = 'Isoform Dynamics Classification Across Brain Tissues')
+#
+# # Display the combined plot
+# print(combined_faceted_plot)
+#
+# # Save the combined plot
+# ggsave("isoform_classification_distributions_faceted.pdf", combined_faceted_plot, width = 10, height = 12, units = "in", dpi = 300)
+#
+# # --- Summary Statistics ---
+# summary_stats_faceted <- all_tissue_data_classified %>%
+#   group_by(tissue) %>%
+#   summarise(
+#     Total_Isoforms = n_distinct(isoform_id),
+#     Avg_Switches = mean(Switch_Count, na.rm = TRUE),
+#     Median_Switches = median(Switch_Count, na.rm = TRUE),
+#     Max_Switches = max(Switch_Count, na.rm = TRUE),
+#     Oscillatory_Percent = mean(Complex_Classification == "Oscillatory", na.rm = TRUE) * 100,
+#     Increasing_Percent = mean(Trend_Classification == "Overall increasing", na.rm = TRUE) * 100,
+#     Decreasing_Percent = mean(Trend_Classification == "Overall decreasing", na.rm = TRUE) * 100,
+#     High_Stability_Percent = mean(replicate_stability == "High", na.rm = TRUE) * 100,
+#     Medium_Stability_Percent = mean(replicate_stability == "Medium", na.rm = TRUE) * 100,
+#     Low_Stability_Percent = mean(replicate_stability == "Low", na.rm = TRUE) * 100
+#   ) %>%
+#   pivot_longer(cols = -tissue, names_to = "Metric", values_to = "Value") %>%
+#   pivot_wider(names_from = tissue, values_from = Value)
+#
+# print("Summary Statistics by Tissue:")
+# print(summary_stats_faceted)
+# write.csv(summary_stats_faceted, "isoform_classification_summary_by_tissue.csv", row.names = FALSE)
+```
+
+---
+
+## Chapter 5: Epigenetic Splicing Influence
+
+This chapter investigates the link between epigenetic modifications (methylation, chromatin states) and alternative splicing (DTU).
+
+### `metyhl_processing.txt`: Placeholder
+
+```R
+# --- metyhl_processing.txt ---
+# Purpose: This file likely contains initial or general methylation data processing steps.
+#          The content was just "# metyhlation processing", so specific steps are unknown.
+#          It might include loading methylation data, initial filtering, or basic QC.
+# Chapter Relevance: Chapter 5 Setup / Data Preparation
+
+# Placeholder for methylation processing code.
+# Specific steps would depend on the raw methylation data format (e.g., Bismark output, BED files).
+# Common steps might include:
+# - Reading methylation call files
+# - Filtering based on coverage
+# - Calculating methylation percentages per CpG site
+# - Creating GRanges objects
+
+print("Placeholder for methylation processing script.")
+
+```
+
+### `metyhlation_dtu_type.txt`: Methylation Analysis by DTU/Switch Type
+
+```R
+# --- metyhlation_dtu_type.txt ---
+# Purpose: Analyzes methylation levels and variance across different alternative splicing
+#          switch types (ES, MEE, MES, IR, A5, A3, ATSS, ATTS) and genomic regions
+#          (upstream, gene body, downstream) in forebrain and midbrain tissues.
+#          Includes visualization (violin/box plots) and statistical comparisons.
+# Chapter Relevance: 5.3 Methylation Induced DTU Alterations / 5.4 Tissue expression divergence and Methylation
+
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(GenomicRanges)
+library(purrr)      # For map functions
+library(scales)     # For formatting plot labels
+library(patchwork)  # For combining plots
+library(rstatix)    # For statistical tests (e.g., pairwise_wilcox_test)
+library(ggsignif)   # For adding significance bars to plots
+
+# --- Function Definitions ---
+
+# Function to calculate methylation statistics (mean, variance) for each isoform/region
+# Input: isoform_data = List where each element represents an isoform/region and contains a 'methylation' sublist
+# Output: Data frame with isoform_id, region, avg_methylation, var_methylation
+calculate_methylation_stats <- function(isoform_data) {
+  # Use map_dfr for efficient row-binding of results
+  purrr::map_dfr(names(isoform_data), function(iso_name) {
+    iso <- isoform_data[[iso_name]]
+    # Check if methylation data exists and is not empty
+    if (!is.null(iso$methylation) && length(iso$methylation) > 0 && all(sapply(iso$methylation, function(stage_data) !is.null(stage_data) && nrow(stage_data) > 0))) {
+      # Calculate mean methylation across all sites and stages for this isoform/region
+      all_methylation_values <- unlist(lapply(iso$methylation, function(stage_data) stage_data$methylation))
+      all_methylation_values <- na.omit(all_methylation_values) # Remove NAs
+
+      # Calculate stats only if there are valid methylation values
+      if (length(all_methylation_values) > 1) {
+         avg_meth <- mean(all_methylation_values)
+         var_meth <- var(all_methylation_values)
+      } else if (length(all_methylation_values) == 1) {
+         avg_meth <- all_methylation_values
+         var_meth <- 0 # Variance is 0 for a single value
+      } else {
+         avg_meth <- NA_real_
+         var_meth <- NA_real_
+      }
+
+      data.frame(
+        isoform_id = iso$isoform_id, # Should be gene_id if processing gene-level ranges
+        region = iso$region,         # Region type (upstream, gene_body, downstream)
+        avg_methylation = avg_meth,
+        var_methylation = var_meth
+      )
+    } else {
+      # Return NA if no valid methylation data
+      data.frame(
+        isoform_id = iso$isoform_id,
+        region = iso$region,
+        avg_methylation = NA_real_,
+        var_methylation = NA_real_
+      )
+    }
+  })
+}
+
+
+# Function to merge methylation stats with splicing switch information
+# Inputs: methylation_data = Output from calculate_methylation_stats
+#         splicing_data = Data frame with isoform_id and binary switch type columns
+#         exons_data = GRanges or data frame with isoform_id and gene_id mapping
+# Output: Data frame combining methylation stats and switch types
+process_switch_types <- function(methylation_data, splicing_data, exons_data) {
+  # Ensure exons_data is a data frame for joining
+  if (is(exons_data, "GRanges")) {
+    exons_data <- as.data.frame(mcols(exons_data)) %>% dplyr::select(isoform_id, gene_id) %>% distinct()
+  } else if ("mcols" %in% slotNames(exons_data)) { # Handle SummarizedExperiment
+      exons_data <- as.data.frame(mcols(exons_data)) %>% dplyr::select(isoform_id, gene_id) %>% distinct()
+  } else {
+      exons_data <- as.data.frame(exons_data) %>% dplyr::select(isoform_id, gene_id) %>% distinct()
+  }
+
+
+  # Create isoform to gene lookup (handle potential duplicates)
+  isoform_gene_lookup <- exons_data %>%
+    dplyr::select(isoform_id, gene_id) %>%
+    dplyr::distinct(isoform_id, .keep_all = TRUE) # Keep only one gene ID per isoform if duplicates exist
+
+  # Process splicing data: select relevant columns, pivot, filter for present switches
+  splicing_types <- c("ES", "MEE", "MES", "IR", "A5", "A3", "ATSS", "ATTS")
+  splicing_processed <- splicing_data %>%
+    dplyr::select(isoform_id, all_of(splicing_types)) %>%
+    tidyr::pivot_longer(cols = all_of(splicing_types),
+                        names_to = "switch_type",
+                        values_to = "has_switch") %>%
+    dplyr::filter(has_switch == 1) %>% # Keep only rows where the switch type is present
+    dplyr::left_join(isoform_gene_lookup, by = "isoform_id") %>% # Add gene_id
+    # Group by isoform/gene to combine multiple switch types if present
+    dplyr::group_by(isoform_id, gene_id) %>%
+    dplyr::summarise(switch_types = paste(sort(unique(switch_type)), collapse = ", "), .groups = "drop")
+
+  # Join methylation data with the processed splicing data
+  # Assuming methylation_data has 'isoform_id' (which might actually be gene_id here based on context) and 'region'
+  result <- methylation_data %>%
+    # Decide whether to join by isoform_id or gene_id based on methylation_data content
+    # If methylation_data is gene-level, join by gene_id
+    dplyr::left_join(splicing_processed, by = c("isoform_id" = "gene_id")) %>% # Adjust join column if needed
+    # If an isoform/gene didn't have any switch type, label it 'Canonical'
+    dplyr::mutate(switch_types = ifelse(is.na(switch_types) | switch_types == "", "Canonical", switch_types))
+
+  print("Dimensions of result after joining methylation and splicing info:")
+  print(dim(result))
+  print("Distribution of switch types (NA means no splicing info found for that methylation entry):")
+  print(table(result$switch_types, useNA = "ifany"))
+
+  return(result)
+}
+
+
+# --- Execution & Visualization ---
+
+# Load necessary input data objects first (replace placeholders)
+# forebrain_all_isoforms, combinedForebrain$AlternativeSplicingAnalysis, combinedForebrain$exons
+# midbrain_all_isoforms, combinedMidBrain$AlternativeSplicingAnalysis, combinedMidBrain$exons
+
+# Calculate methylation statistics for both tissues
+# forebrain_methylation <- calculate_methylation_stats(forebrain_all_isoforms)
+# midbrain_methylation <- calculate_methylation_stats(midbrain_all_isoforms)
+
+# Process switch types for both tissues
+# forebrain_switches <- process_switch_types(forebrain_methylation,
+#                                           combinedForebrain$AlternativeSplicingAnalysis,
+#                                           combinedForebrain$exons) %>%
+#  mutate(tissue = "Forebrain")
+#
+# midbrain_switches <- process_switch_types(midbrain_methylation,
+#                                          combinedMidBrain$AlternativeSplicingAnalysis,
+#                                          combinedMidBrain$exons) %>%
+#  mutate(tissue = "Midbrain")
+#
+# Combine data from both tissues
+# all_switches <- dplyr::bind_rows(forebrain_switches, midbrain_switches)
+
+# --- Visualization Function (Improved) ---
+# Function to create violin/box plots with significance testing
+plot_methylation_by_switch <- function(data, y_var, y_label, region_name, log_scale = FALSE) {
+
+  plot_title <- paste(y_label, "by Switch Type -", region_name)
+  plot_data <- data %>% filter(region == region_name)
+
+  # Define order for switch types
+  switch_order <- c("Canonical", "ES", "MEE", "MES", "IR", "A5", "A3", "ATSS", "ATTS")
+  plot_data$switch_types <- factor(plot_data$switch_types, levels = switch_order)
+
+  # Perform pairwise Wilcoxon tests within each tissue
+  stat_test <- plot_data %>%
+    group_by(tissue) %>%
+    pairwise_wilcox_test(
+      as.formula(paste(y_var, "~ switch_types")),
+      p.adjust.method = "BH"
+    ) %>%
+    add_xy_position(x = "switch_types", dodge = 0.8) %>%
+    filter(p.adj < 0.05) # Only keep significant comparisons
+
+  # Dynamically adjust y position for significance labels
+  y_max <- max(plot_data[[y_var]], na.rm=TRUE)
+  if (log_scale) {
+      stat_test <- stat_test %>% mutate(y.position = 10^(log10(y_max) + seq(0.1, by=0.1, length.out=n())))
+  } else {
+      stat_test <- stat_test %>% mutate(y.position = y_max + seq(0.05*y_max, by=0.05*y_max, length.out=n()))
+  }
+
+
+  # Create the plot
+  p <- ggplot(plot_data, aes(x = switch_types, y = !!sym(y_var), fill = tissue)) +
+    geom_violin(position = position_dodge(width = 0.8), scale = "width", trim = TRUE, alpha = 0.6) +
+    geom_boxplot(position = position_dodge(width = 0.8), width = 0.1, outlier.shape = NA, alpha = 0.8) +
+    stat_summary(fun = median, geom = "point", position = position_dodge(width = 0.8),
+                 color = "white", size = 1) +
+    # Add significance annotations
+    stat_pvalue_manual(
+      stat_test, label = "p.adj.signif", tip.length = 0.01,
+      size = 3, hide.ns = TRUE
+    ) +
+    labs(x = NULL, y = y_label, title = plot_title) +
+    theme_minimal(base_size = 10) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+      axis.title.y = element_text(size = 9),
+      legend.position = "right",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 8),
+      plot.title = element_text(hjust = 0.5, size=11, face="bold"),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(color = "grey80", fill = NA, size = 0.5)
+    ) +
+    scale_fill_manual(values = c("Forebrain" = "#E41A1C", "Midbrain" = "#377EB8")) # Colorblind-friendly Red/Blue
+
+  # Apply log scale if requested
+  if (log_scale) {
+    p <- p + scale_y_log10(labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+             coord_cartesian(ylim = c(NA, max(stat_test$y.position)*1.1)) # Adjust y limit for labels
+  } else {
+    p <- p + coord_cartesian(ylim = c(NA, max(stat_test$y.position)*1.1)) # Adjust y limit for labels
+  }
+
+  return(p)
+}
+
+# --- Generate and Save Plots for Each Region ---
+# Assuming 'all_switches' is the combined dataframe from process_switch_types
+# regions_to_plot <- unique(all_switches$region) # e.g., c("upstream", "gene_body", "downstream")
+#
+# for (reg in regions_to_plot) {
+#    avg_plot <- plot_methylation_by_switch(all_switches, "avg_methylation", "Average Methylation %", reg)
+#    var_plot <- plot_methylation_by_switch(all_switches, "var_methylation", "Variance of Methylation", reg, log_scale = TRUE)
+#
+#    combined_region_plot <- avg_plot / var_plot + plot_layout(guides = "collect")
+#
+#    ggsave(paste0("methylation_by_switch_", reg, ".pdf"), combined_region_plot, width = 10, height = 10)
+#    print(paste("Saved plot for region:", reg))
+# }
+```
+
+### `metyhlation_expression.txt`: Methylation vs. Expression Correlation
+
+```R
+# --- metyhlation_expression.txt ---
+# Purpose: Investigates the correlation between DNA methylation levels and isoform
+#          expression (both raw counts/TPM and relative isoform frequency - RepIF)
+#          across different genomic regions (upstream, gene body, downstream).
+#          Includes volcano plots to identify significant associations and analysis
+#          of specific genes (e.g., Shtn1).
+# Chapter Relevance: 5.3 Methylation Induced DTU Alterations
+
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(ggrepel)   # For non-overlapping labels
+library(patchwork) # For combining plots
+library(EnhancedVolcano) # For creating volcano plots
+library(stats)     # For cor.test, lm
+
+# --- Data Preparation ---
+# Assuming 'forebrain_results' and 'midbrain_results' lists are loaded,
+# containing $combined_data with methylation and expression values per isoform/stage/region
+
+# Combine results from both tissues for easier analysis
+# Ensure correct columns exist before combining
+required_cols <- c("gene_id", "region", "isoform_id", "stage",
+                   "methylation", "mean_expression_repif", "mean_expression_raw")
+
+# Function to safely select and rename columns
+prepare_tissue_data <- function(tissue_data, tissue_name) {
+    if(is.null(tissue_data) || is.null(tissue_data$combined_data)) {
+        warning(paste("Combined data not found for", tissue_name))
+        return(data.frame())
+    }
+    df <- tissue_data$combined_data
+    # Check if necessary columns exist
+    if (!all(required_cols %in% colnames(df))) {
+        warning(paste("Missing required columns in", tissue_name, "data. Columns found:", paste(colnames(df), collapse=", ")))
+        # Attempt to map columns if names are slightly different (example)
+        # colnames(df)[colnames(df) == "mean_expression"] <- "mean_expression_raw" # Adjust as needed
+        # if (!"mean_expression_repif" %in% colnames(df)) df$mean_expression_repif <- NA # Add placeholder if missing
+        # ... add more mapping or placeholder logic ...
+        # For now, return empty if columns missing
+        return(data.frame())
+    }
+    df %>%
+        dplyr::select(all_of(required_cols)) %>%
+        mutate(tissue = tissue_name)
+}
+
+forebrain_prepared <- prepare_tissue_data(forebrain_results, "ForeBrain")
+midbrain_prepared <- prepare_tissue_data(midbrain_results, "MidBrain")
+
+# Combine if both preparations were successful
+if(nrow(forebrain_prepared) > 0 && nrow(midbrain_prepared) > 0) {
+    all_methylation_expression_correlations <- bind_rows(forebrain_prepared, midbrain_prepared)
+    print("Combined methylation and expression data prepared.")
+    print(paste("Total rows:", nrow(all_methylation_expression_correlations)))
+    print(paste("Unique isoforms:", n_distinct(all_methylation_expression_correlations$isoform_id)))
+} else {
+    stop("Failed to prepare data for one or both tissues. Cannot proceed.")
+}
+
+
+# --- Correlation Calculation ---
+# Calculate correlation between methylation and expression (RepIF and Raw) for each isoform/region/tissue
+correlation_results <- all_methylation_expression_correlations %>%
+  group_by(tissue, region, isoform_id, gene_id) %>% # Added gene_id
+  summarise(
+    n_stages = n(),
+    # Calculate RepIF correlation
+    correlation_repif = tryCatch({
+        if(n_stages > 2 && sd(methylation, na.rm=TRUE) > 0 && sd(mean_expression_repif, na.rm=TRUE) > 0) {
+           cor(methylation, mean_expression_repif, use="pairwise.complete.obs")
+        } else { NA_real_ }
+    }, error = function(e) NA_real_),
+    p_value_repif = tryCatch({
+        if(n_stages > 2 && sd(methylation, na.rm=TRUE) > 0 && sd(mean_expression_repif, na.rm=TRUE) > 0) {
+           cor.test(methylation, mean_expression_repif, use="pairwise.complete.obs")$p.value
+        } else { NA_real_ }
+    }, error = function(e) NA_real_),
+    # Calculate Raw expression correlation
+    correlation_raw = tryCatch({
+        if(n_stages > 2 && sd(methylation, na.rm=TRUE) > 0 && sd(mean_expression_raw, na.rm=TRUE) > 0) {
+           cor(methylation, mean_expression_raw, use="pairwise.complete.obs")
+        } else { NA_real_ }
+    }, error = function(e) NA_real_),
+    p_value_raw = tryCatch({
+        if(n_stages > 2 && sd(methylation, na.rm=TRUE) > 0 && sd(mean_expression_raw, na.rm=TRUE) > 0) {
+           cor.test(methylation, mean_expression_raw, use="pairwise.complete.obs")$p.value
+        } else { NA_real_ }
+    }, error = function(e) NA_real_),
+    .groups = "drop" # Drop grouping after summarise
+  ) %>%
+  # Calculate Fold Change (using range as a proxy - needs raw expression data, this is approximate)
+  left_join(
+      all_methylation_expression_correlations %>%
+          group_by(tissue, region, isoform_id) %>%
+          summarise(expr_range_repif = max(mean_expression_repif, na.rm=T) - min(mean_expression_repif, na.rm=T),
+                    expr_range_raw = max(mean_expression_raw, na.rm=T) - min(mean_expression_raw, na.rm=T),
+                    .groups="drop"),
+      by = c("tissue", "region", "isoform_id")
+  ) %>%
+  mutate(
+    # Calculate BH adjusted p-values for each tissue/region combination
+    grouping = paste(tissue, region),
+    adj_p_value_repif = p.adjust(p_value_repif, method = "BH"), # Adjust globally first
+    adj_p_value_raw = p.adjust(p_value_raw, method = "BH")      # Adjust globally first
+    # log2FoldChange_repif = ifelse(expr_range_repif > 0, log2(expr_range_repif), 0), # Simple range, not true FC
+    # log2FoldChange_raw = ifelse(expr_range_raw > 0, log2(expr_range_raw), 0)       # Simple range, not true FC
+  ) %>%
+  group_by(grouping) %>% # Group again for within-group adjustment
+  mutate(
+    adj_p_value_repif_group = p.adjust(p_value_repif, method = "BH"),
+    adj_p_value_raw_group = p.adjust(p_value_raw, method = "BH")
+  ) %>%
+  ungroup()
+
+# Check results
+print("Correlation calculation summary:")
+print(summary(correlation_results))
+print(paste("Rows with NA correlation (RepIF):", sum(is.na(correlation_results$correlation_repif))))
+print(paste("Rows with NA correlation (Raw):", sum(is.na(correlation_results$correlation_raw))))
+
+# --- Visualization ---
+
+# 1. Distribution of p-values (Density Plot and Histogram) - Figure 5.11 / B.9
+plot_pvalue_distribution <- function(correlation_df, p_col, adj_p_col, title_suffix) {
+  p_density <- ggplot(correlation_df, aes(x = !!sym(adj_p_col), fill = region, color = region)) +
+    geom_density(alpha = 0.5) +
+    scale_fill_brewer(palette = "Set2") +
+    scale_color_brewer(palette = "Set2") +
+    geom_vline(xintercept = 0.05, linetype = "dashed", color = "red") +
+    labs(x = "Adjusted p-value", y = "Density") +
+    theme_minimal() +
+    coord_cartesian(xlim = c(0, 1)) # Focus on 0-1 range
+
+  p_histogram <- ggplot(correlation_df, aes(x = !!sym(adj_p_col), fill = region)) +
+    geom_histogram(position = "identity", alpha = 0.5, bins = 50) + # Increased bins
+    scale_fill_brewer(palette = "Set2") +
+    geom_vline(xintercept = 0.05, linetype = "dashed", color = "red") +
+    labs(x = "Adjusted p-value", y = "Count") +
+    theme_minimal() +
+    coord_cartesian(xlim = c(0, 1)) # Focus on 0-1 range
+
+  combined_plot <- (p_density + labs(title="Density Plot")) / (p_histogram + labs(title="Histogram")) +
+    plot_layout(guides = "collect") & theme(legend.position = "bottom")
+  combined_plot + plot_annotation(title = paste("BH Corrected p-values of", title_suffix, "Methylation Correlation"))
+
+  return(combined_plot)
+}
+
+# Create plots for Raw Expression and RepIF
+raw_pvalue_plot <- plot_pvalue_distribution(correlation_results, "p_value_raw", "adj_p_value_raw", "Raw Expression")
+repif_pvalue_plot <- plot_pvalue_distribution(correlation_results, "p_value_repif", "adj_p_value_repif", "Relative Isoform Frequency (RepIF)")
+
+# Save plots
+ggsave("correlation_pvalue_distribution_raw.pdf", raw_pvalue_plot, width = 8, height = 8)
+ggsave("correlation_pvalue_distribution_repif.pdf", repif_pvalue_plot, width = 8, height = 8)
+
+# 2. Scatter plot comparing Raw vs RepIF correlations - Figure B.13
+correlation_scatter <- ggplot(correlation_results, aes(x = correlation_repif, y = correlation_raw, color = region)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed", size=0.5) +
+  facet_wrap(~tissue) +
+  scale_color_viridis_d() + # Use viridis for colorblind-friendliness
+  coord_cartesian(xlim = c(-1, 1), ylim = c(-1, 1)) +
+  geom_abline(intercept = 0, slope = 1, color="grey50", linetype="dotted") + # Add y=x line
+  labs(x = "RepIF Correlation", y = "Raw Expression Correlation", color = "Region",
+       title = "Comparison of RepIf and Raw Methylation-Expression Correlations") +
+  theme_bw(base_size = 10) +
+  theme(legend.position = "bottom", strip.text = element_text(face="bold"))
+
+# Add marginal densities (requires ggExtra)
+# library(ggExtra)
+# correlation_scatter_marginal <- ggMarginal(correlation_scatter, type = "density", groupColour = TRUE, groupFill = TRUE)
+# print(correlation_scatter_marginal)
+# ggsave("correlation_scatter_raw_vs_repif_marginal.pdf", correlation_scatter_marginal, width = 10, height = 6)
+
+# Save the basic scatter plot
+ggsave("correlation_scatter_raw_vs_repif.pdf", correlation_scatter, width = 9, height = 5)
+
+
+# 3. Volcano Plots - Figure 5.12 / B.10
+# Note: EnhancedVolcano requires log2FoldChange. We use expr_range_repif as a proxy.
+#       A true fold change requires comparing conditions (e.g., high vs low methylation groups).
+#       This visualization shows correlation significance vs expression range magnitude.
+volcano_data <- correlation_results %>%
+    mutate(log2FoldChange = log2(expr_range_repif + 1)) # Use range as proxy for FC magnitude
+
+# Create volcano plot for ForeBrain (RepIF)
+volcano_forebrain <- EnhancedVolcano(volcano_data %>% filter(tissue == "ForeBrain"),
+                   lab = volcano_data$gene_id[volcano_data$tissue == "ForeBrain"], # Use gene_id for labels
+                   x = 'correlation_repif', # Using correlation as effect size measure
+                   y = 'adj_p_value_repif', # Using adjusted p-value
+                   title = 'ForeBrain Methylation-RepIF Correlation',
+                   pCutoff = 0.05,
+                   FCcutoff = 0.5, # Threshold for absolute correlation
+                   pointSize = 2.0,
+                   labSize = 2.5,
+                   colAlpha = 0.5,
+                   legendPosition = 'right',
+                   drawConnectors = TRUE,
+                   widthConnectors = 0.5,
+                   max.overlaps = 15)
+
+# Create volcano plot for MidBrain (RepIF)
+volcano_midbrain <- EnhancedVolcano(volcano_data %>% filter(tissue == "MidBrain"),
+                   lab = volcano_data$gene_id[volcano_data$tissue == "MidBrain"], # Use gene_id for labels
+                   x = 'correlation_repif',
+                   y = 'adj_p_value_repif',
+                   title = 'MidBrain Methylation-RepIF Correlation',
+                   pCutoff = 0.05,
+                   FCcutoff = 0.5,
+                   pointSize = 2.0,
+                   labSize = 2.5,
+                   colAlpha = 0.5,
+                   legendPosition = 'right',
+                   drawConnectors = TRUE,
+                   widthConnectors = 0.5,
+                   max.overlaps = 15)
+
+# Save volcano plots
+ggsave("volcano_plot_forebrain_repif.pdf", volcano_forebrain, width = 10, height = 10)
+ggsave("volcano_plot_midbrain_repif.pdf", volcano_midbrain, width = 10, height = 10)
+
+
+# 4. Detailed analysis of Shtn1 (Example) - Figure 5.13
+shtn1_gene_id <- "Shtn1" # Replace with actual gene ID if different
+
+# Find Shtn1 gene ID if necessary (if you only have isoform IDs)
+# Example: shtn1_gene_id <- filter(correlation_results, grepl("Shtn1", isoform_id)) %>% pull(gene_id) %>% unique()
+
+if (length(shtn1_gene_id) == 1) {
+    shtn1_data <- all_methylation_expression_correlations %>%
+        filter(gene_id == shtn1_gene_id, tissue == "ForeBrain") %>% # Focus on Forebrain for example
+        mutate(stage = factor(stage, levels = timepoint_order))
+
+    shtn1_correlation_data <- correlation_results %>%
+        filter(gene_id == shtn1_gene_id, tissue == "ForeBrain")
+
+    # Plot 1: Methylation vs Expression (Scatter)
+    p_scatter <- ggplot(shtn1_data, aes(x = methylation, y = mean_expression_raw, color = isoform_id)) +
+      geom_point(size=3) +
+      geom_smooth(method="lm", se=FALSE, linetype="dashed") +
+      theme_minimal() +
+      labs(title="ForeBrain - Shtn1 Methylation vs Expression",
+           subtitle=paste("Region:", unique(shtn1_data$region)),
+           x = "Methylation (%)", y="Raw Expression") +
+      ggrepel::geom_text_repel(data = shtn1_correlation_data,
+                               aes(x=Inf, y=Inf, label=sprintf("R²=%.2f", correlation_raw^2)),
+                               hjust=1.1, vjust=1.1, inherit.aes=FALSE, size=3) +
+      theme(legend.position = "bottom")
+
+    # Plot 2: Relative Methylation and Expression over Time
+    shtn1_relative <- shtn1_data %>%
+      group_by(isoform_id, region) %>%
+      mutate(rel_methylation = scales::rescale(methylation), # Rescale to 0-1
+             rel_expression = scales::rescale(mean_expression_raw)) %>% # Rescale raw expression
+      ungroup()
+
+    p_time <- ggplot(shtn1_relative, aes(x=stage, group=interaction(isoform_id, region))) +
+        geom_line(aes(y=rel_methylation, color=isoform_id), linetype="solid") +
+        geom_point(aes(y=rel_methylation, color=isoform_id)) +
+        geom_line(aes(y=rel_expression, color=isoform_id), linetype="dashed") +
+        geom_point(aes(y=rel_expression, color=isoform_id), shape=1) +
+        facet_wrap(~region) + # Facet by region
+        theme_minimal() +
+        labs(title="Forebrain - Shtn1 Relative Methylation and Expression Over Time",
+             x="Developmental Stage", y="Relative Value (0-1)", color="Isoform ID") +
+        theme(axis.text.x = element_text(angle=45, hjust=1), legend.position="bottom") +
+        annotate("text", x = Inf, y = Inf, label = "Solid: Methylation\nDashed: Expression",
+                 hjust = 1.1, vjust = 1.1, size = 3)
+
+    # Plot 3: CpG Methylation States Along the Region (Requires raw methylation data)
+    # This requires loading the detailed methylation data for Shtn1, which is complex.
+    # Placeholder plot:
+    p_cpg <- ggplot() + theme_void() + labs(title="ForeBrain - Shtn1 CpG Methylation States (Data Not Shown)")
+
+    # Combine plots
+    shtn1_combined_plot <- (p_scatter / p_time / p_cpg) + plot_layout(heights=c(1,1,1))
+    print(shtn1_combined_plot)
+    ggsave("shtn1_forebrain_methylation_analysis.pdf", shtn1_combined_plot, width=8, height=12)
+
+} else {
+    print("Shtn1 gene ID not found or ambiguous.")
+}
+
+
+# 5. Quadratic vs Linear Fit Comparison - Figure B.14
+# Function to compare linear and quadratic fits for a specific isoform
+plot_fit_comparison <- function(data, gene_iso_id, tissue) {
+    plot_data <- data %>% filter(isoform_id == gene_iso_id, tissue == tissue)
+    if(nrow(plot_data) < 3) return(NULL)
+
+    lm_fit <- lm(mean_expression_raw ~ methylation, data=plot_data)
+    quad_fit <- lm(mean_expression_raw ~ methylation + I(methylation^2), data=plot_data)
+
+    lm_r2 <- summary(lm_fit)$r.squared
+    quad_r2 <- summary(quad_fit)$r.squared
+    better_model <- ifelse(quad_r2 > lm_r2 + 0.05, "Quadratic", "Linear/Equivalent") # Simple comparison
+
+    p <- ggplot(plot_data, aes(x=methylation, y=mean_expression_raw)) +
+        geom_point() +
+        geom_smooth(method="lm", formula = y~x, se=FALSE, color="blue", linetype="solid") +
+        geom_smooth(method="lm", formula = y~x + I(x^2), se=FALSE, color="red", linetype="dashed") +
+        labs(title=paste(gene_iso_id, "in", tissue),
+             subtitle=paste("Linear R² =", round(lm_r2, 3), "| Quadratic R² =", round(quad_r2, 3),
+                            "\nBetter model:", better_model),
+             x="Methylation (%)", y="Raw Expression") +
+        theme_minimal()
+    return(p)
+}
+
+# Example usage for A930004D18Rik - NR_028376
+iso_id_example <- "NR_028376" # Adjust if needed
+p_fore <- plot_fit_comparison(all_methylation_expression_correlations, iso_id_example, "ForeBrain")
+p_mid <- plot_fit_comparison(all_methylation_expression_correlations, iso_id_example, "MidBrain")
+
+if (!is.null(p_fore) && !is.null(p_mid)) {
+    combined_fit_plot <- p_fore + p_mid + plot_annotation(title="Linear vs Quadratic Methylation-Expression Fit")
+    print(combined_fit_plot)
+    ggsave("quadratic_vs_linear_fit_example.pdf", combined_fit_plot, width=10, height=5)
+}
+
+
+# --- Summary Tables ---
+# Table 5.3: Significant correlations summary
+significant_summary <- correlation_results %>%
+  filter(adj_p_value_raw_group < 0.05 | adj_p_value_repif_group < 0.05) %>% # Use group-adjusted p-values
+  group_by(tissue, region) %>%
+  summarise(Significant_Raw = sum(adj_p_value_raw_group < 0.05, na.rm=TRUE),
+            Significant_RepIF = sum(adj_p_value_repif_group < 0.05, na.rm=TRUE),
+            .groups="drop")
+
+print("Table 5.3 Summary:")
+print(significant_summary)
+
+
+# Table 5.4: Focus Genes (Requires manual identification based on criteria)
+# Example criteria: Strong correlation (|cor| > 0.6), significance (adj_p < 0.05),
+#                   and potentially evidence of switching behavior (positive and negative correlations for different isoforms of the same gene).
+# This requires more complex filtering based on the analysis goals.
+focus_genes <- correlation_results %>%
+    group_by(gene_id, tissue) %>%
+    filter(any(correlation_repif > 0.6 & adj_p_value_repif < 0.05, na.rm=T) &
+           any(correlation_repif < -0.6 & adj_p_value_repif < 0.05, na.rm=T)) %>%
+    ungroup() %>%
+    distinct(gene_id, tissue) %>%
+    # Add biological relevance manually or by joining with annotation data
+    mutate(Biological_Relevance = "Placeholder - Add function here")
+
+print("Table 5.4 Focus Genes (Example based on strong opposing correlations):")
+print(focus_genes)
+write.csv(focus_genes, "focus_genes_example.csv", row.names = FALSE)
+
+```
+
+### `metyhlation_expression_divergence.txt`: Inter-tissue Methylation Divergence and Expression
+
+```R
+# --- metyhlation_expression_divergence.txt ---
+# Purpose: Compares methylation and expression profiles between forebrain and
+#          midbrain tissues at identical developmental stages. Calculates a
+#          methylation divergence score (Z-score) and correlates it with
+#          transient expression divergence between the tissues.
+# Chapter Relevance: 5.4 Tissue expression divergence and Methylation
+
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(scales)      # For pvalue formatting
+library(stats)       # For sd, t.test, wilcox.test, ks.test
+library(broom)       # For tidying test results
+
+# --- Data Preparation ---
+# Assuming 'forebrain_data' and 'midbrain_data' are loaded, containing methylation
+# and expression data per isoform/region/stage (output from safe_process_data in previous script)
+
+# Ensure stage columns match and data is aligned by isoform and region
+combined_intertissue_data <- full_join(
+  forebrain_data %>% rename_with(~paste0(., "_forebrain"), -c(gene_id, isoform_id, region, stage)),
+  midbrain_data %>% rename_with(~paste0(., "_midbrain"), -c(gene_id, isoform_id, region, stage)),
+  by = c("gene_id", "isoform_id", "region", "stage")
+)
+
+# Calculate differences
+combined_intertissue_data <- combined_intertissue_data %>%
+  mutate(
+    methylation_diff = methylation_midbrain - methylation_forebrain,
+    expression_diff = mean_expression_midbrain - mean_expression_forebrain # Using mean expression
+  ) %>%
+  # Remove rows where either tissue has NA for methylation or expression
+  filter(!is.na(methylation_diff) & !is.na(expression_diff))
+
+# --- Methylation Divergence Z-Score Calculation ---
+# Calculate overall mean and sd of methylation difference per isoform/region
+meth_diff_stats <- combined_intertissue_data %>%
+  group_by(isoform_id, region) %>%
+  summarise(
+    mean_meth_diff = mean(methylation_diff, na.rm = TRUE),
+    sd_meth_diff = sd(methylation_diff, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Join stats back and calculate Z-score
+divergence_data <- combined_intertissue_data %>%
+  left_join(meth_diff_stats, by = c("isoform_id", "region")) %>%
+  # Calculate Z-score, handle division by zero or NA SD
+  mutate(
+    meth_divergence_z = ifelse(!is.na(sd_meth_diff) & sd_meth_diff > 1e-6,
+                              abs(methylation_diff - mean_meth_diff) / sd_meth_diff,
+                              0), # Assign 0 if SD is zero or NA
+    stage_numeric = as.numeric(gsub("p0", "17", gsub("^e", "", stage))) # Convert stage to numeric for ordering
+   ) %>%
+  select(gene_id, isoform_id, region, stage, stage_numeric,
+         methylation_diff, expression_diff, meth_divergence_z)
+
+
+# --- Identify Expression Divergence Points ---
+# Define divergence based on expression difference Z-score (similar to methylation)
+expr_diff_stats <- divergence_data %>%
+  group_by(isoform_id, region) %>%
+  summarise(
+    mean_expr_diff = mean(expression_diff, na.rm = TRUE),
+    sd_expr_diff = sd(expression_diff, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+divergence_data <- divergence_data %>%
+  left_join(expr_diff_stats, by = c("isoform_id", "region")) %>%
+  mutate(
+    expr_divergence_z = ifelse(!is.na(sd_expr_diff) & sd_expr_diff > 1e-6,
+                              abs(expression_diff - mean_expr_diff) / sd_expr_diff,
+                              0),
+    # Define divergence points (example: Z-score > 1.96, adjust as needed)
+    is_divergence_point = expr_divergence_z > 1.96
+  )
+
+# --- Analyze Methylation at Divergence vs. Non-Divergence Points ---
+# Separate data into single and multiple divergence point patterns
+divergence_summary <- divergence_data %>%
+  group_by(isoform_id, region) %>%
+  summarise(n_divergence_points = sum(is_divergence_point, na.rm = TRUE), .groups = "drop")
+
+divergence_data <- divergence_data %>%
+  left_join(divergence_summary, by = c("isoform_id", "region")) %>%
+  mutate(divergence_pattern = case_when(
+    n_divergence_points == 0 ~ "No Divergence",
+    n_divergence_points == 1 ~ "Single Timepoint",
+    n_divergence_points > 1 ~ "Multiple Timepoints",
+    TRUE ~ "Unknown" # Handle potential NAs
+  )) %>%
+  filter(divergence_pattern != "No Divergence") # Focus on divergent isoforms
+
+# --- Statistical Tests and Visualization (Figure 5.14) ---
+# Prepare data for plotting
+plot_data_fig5.14 <- divergence_data %>%
+  mutate(is_divergence_point = factor(is_divergence_point, levels = c(FALSE, TRUE))) %>%
+  filter(!is.na(meth_divergence_z)) # Ensure Z-score is valid
+
+# Perform statistical tests for each region/pattern combination
+stat_results <- plot_data_fig5.14 %>%
+  group_by(region, divergence_pattern) %>%
+  do(
+    if(length(unique(.$is_divergence_point)) == 2) { # Only test if both groups exist
+      bind_rows(
+        broom::tidy(wilcox.test(meth_divergence_z ~ is_divergence_point, data = .)) %>% mutate(test="Wilcoxon"),
+        broom::tidy(t.test(meth_divergence_z ~ is_divergence_point, data = .)) %>% mutate(test="t-test"),
+        broom::tidy(ks.test(meth_divergence_z[.$is_divergence_point == TRUE],
+                            meth_divergence_z[.$is_divergence_point == FALSE])) %>% mutate(test="KS-test")
+      )
+    } else { NULL }
+  ) %>% ungroup()
+
+# Create annotation labels
+stat_labels <- stat_results %>%
+  group_by(region, divergence_pattern) %>%
+  summarise(label = paste(sprintf("%s p = %.2e", test, p.value), collapse="\n"), .groups="drop")
+
+# Density plot
+p_fig5.14 <- ggplot(plot_data_fig5.14, aes(x = meth_divergence_z, fill = is_divergence_point)) +
+  geom_density(alpha = 0.6) +
+  facet_grid(divergence_pattern ~ region) +
+  scale_fill_manual(values = c("FALSE" = "grey", "TRUE" = "red"), name="Is Expression\nDivergence Point") +
+  theme_bw(base_size = 10) +
+  labs(x = "Methylation Difference Z-Score", y = "Density",
+       title = "Methylation Difference Distribution by Divergence Pattern and Region") +
+  theme(legend.position = "bottom", strip.text = element_text(face="bold")) +
+  # Add statistical labels
+  geom_text(data = stat_labels, aes(x = Inf, y = Inf, label = label),
+            hjust = 1.05, vjust = 1.05, size = 2.5, inherit.aes = FALSE)
+
+print(p_fig5.14)
+ggsave("methylation_divergence_distribution_fig5.14.pdf", p_fig5.14, width = 10, height = 7)
+
+
+# --- Analysis of Top Divergent Isoforms (Figure 5.15) ---
+# Identify top isoforms based on the highest *methylation* divergence Z-score at *expression* divergence points
+top_divergent_isoforms <- divergence_data %>%
+  filter(is_divergence_point == TRUE) %>%
+  group_by(isoform_id) %>%
+  summarise(max_meth_z_at_divergence = max(meth_divergence_z, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(max_meth_z_at_divergence)) %>%
+  slice_head(n = 4) # Get top 4
+
+# Prepare data for plotting these top 4
+plot_data_fig5.15 <- divergence_data %>%
+  filter(isoform_id %in% top_divergent_isoforms$isoform_id) %>%
+  mutate(stage = factor(stage, levels = timepoint_order),
+         isoform_label = paste0(isoform_id, " (Score: ",
+                                round(top_divergent_isoforms$max_meth_z_at_divergence[match(isoform_id, top_divergent_isoforms$isoform_id)], 2), ")"))
+
+# Determine y-axis limits dynamically for each isoform
+plot_limits <- plot_data_fig5.15 %>%
+  group_by(isoform_label) %>%
+  summarise(y_max_meth = max(abs(methylation_diff), na.rm=TRUE) * 1.1,
+            y_max_expr = max(abs(expression_diff), na.rm=TRUE) * 1.1)
+
+plot_data_fig5.15 <- plot_data_fig5.15 %>% left_join(plot_limits, by="isoform_label")
+
+# Create the faceted plot (Figure 5.15)
+p_fig5.15 <- ggplot(plot_data_fig5.15, aes(x = stage)) +
+    geom_line(aes(y = methylation_diff, color = "Methylation", group = 1), size=0.5) +
+    geom_line(aes(y = expression_diff / y_max_expr * y_max_meth, color = "Expression", group = 1), size=0.5) + # Scale expression difference
+    geom_point(aes(y = methylation_diff, color = "Methylation", size = is_divergence_point), alpha=0.8) +
+    geom_point(aes(y = expression_diff / y_max_expr * y_max_meth, color = "Expression", size = is_divergence_point), alpha=0.8) + # Scale expression difference
+    facet_grid(isoform_label ~ region, scales = "free_y") + # Facet by isoform and region
+    scale_color_manual(values = c("Methylation" = "blue", "Expression" = "red")) +
+    scale_size_manual(values = c("TRUE" = 3, "FALSE" = 1.5), name="Expr Divergence Point") +
+    scale_y_continuous(name = "Methylation Difference",
+                       sec.axis = sec_axis(~. * y_max_expr / y_max_meth, name = "Expression Difference")) +
+    theme_minimal(base_size = 9) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size=7),
+          legend.position = "bottom",
+          strip.text.y = element_text(angle=0, hjust=0, size=7, face="bold"),
+          strip.text.x = element_text(face="bold")) +
+    labs(x = "Developmental Stage", color=NULL)
+
+print(p_fig5.15)
+ggsave("top_divergent_isoforms_methylation_expression_fig5.15.pdf", p_fig5.15, width = 10, height = 10)
+
+```
+
+### `hmm_enrichment.txt` & `hmm_enrichment2.txt`: HMM State Enrichment Analysis
+
+```R
+# --- hmm_enrichment.txt / hmm_enrichment2.txt ---
+# Purpose: Analyzes the enrichment of different HMM (Hidden Markov Model) chromatin
+#          states within various genomic features (exons, introns, flanks) associated
+#          with DTU genes, canonical genes, or specific splicing event types.
+# Chapter Relevance: 5.2 Epigenetic Landscape Analysis (HMM states)
+
+# Load necessary libraries
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)   # For combining plots
+library(viridis)     # For color scales
+library(scales)      # For formatting axes
+library(rtracklayer) # For importing BED files (HMM states)
+library(data.table)  # For efficient data manipulation
+library(stats)       # For statistical tests (t.test, wilcox.test, aov)
+library(broom)       # For tidying test results
+
+# --- Data Loading ---
+# Load HMM states (replace with your actual loading code)
+# hmm <- rtracklayer::import("./chromHMM/forebrain_13.5_mm10_15_posterior.bed") # Example path
+# Ensure 'hmm' is a GRanges object with a 'name' metadata column for the state
+
+# Load pre-processed genomic features (output from previous scripts)
+# dtu_features: List containing GRanges for exons, introns, upstream_flanks, downstream_flanks of DTU genes
+# canonical_features: List containing GRanges for exons, introns, upstream_flanks, downstream_flanks of canonical genes
+# all_exons: Combined GRanges object of all exons with gene_id and isoform_id metadata
+# switch_info_with_genes: Data frame mapping gene_id to switch consequences
+
+# --- Helper Functions ---
+
+# Function to calculate HMM genome proportion (Background)
+calculate_hmm_genome_proportion <- function(hmm) {
+  # Ensure width calculation is robust
+  valid_widths <- width(hmm)[width(hmm) > 0]
+  df <- data.frame(
+    hmm_state = hmm$name[width(hmm) > 0],
+    length = valid_widths
+  )
+  if(nrow(df) == 0) return(data.frame(hmm_state=character(), total_length=numeric(), proportion=numeric()))
+
+  state_lengths <- tapply(df$length, df$hmm_state, sum, na.rm = TRUE)
+  total_genome_length <- sum(state_lengths, na.rm = TRUE)
+  proportion <- state_lengths / total_genome_length
+
+  data.frame(
+    hmm_state = names(proportion),
+    total_length = as.numeric(state_lengths),
+    proportion = as.numeric(proportion),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Function to analyze HMM state proportions within a set of genomic regions
+# Updated to handle potential empty GRanges and use mean proportions
+analyze_hmm_proportions <- function(regions_gr, hmm, feature_name) {
+  if (length(regions_gr) == 0) {
+    warning(paste("No regions provided for", feature_name))
+    return(data.frame(hmm_state = unique(hmm$name), proportion = 0, feature = feature_name, stringsAsFactors = FALSE))
+  }
+
+  overlaps <- suppressWarnings(findOverlaps(regions_gr, hmm))
+  if (length(overlaps) == 0) {
+    warning(paste("No overlaps found for", feature_name))
+    return(data.frame(hmm_state = unique(hmm$name), proportion = 0, feature = feature_name, stringsAsFactors = FALSE))
+  }
+
+  # Calculate the proportion of each region covered by each HMM state
+  overlap_widths <- width(pintersect(regions_gr[queryHits(overlaps)], hmm[subjectHits(overlaps)]))
+  region_widths <- width(regions_gr)[queryHits(overlaps)]
+
+  coverage_data <- data.frame(
+    query_idx = queryHits(overlaps),
+    hmm_state = hmm$name[subjectHits(overlaps)],
+    overlap_width = overlap_widths,
+    region_width = region_widths
+  )
+
+  # Calculate proportion per region, then average
+  region_proportions <- coverage_data %>%
+    group_by(query_idx, hmm_state) %>%
+    summarise(total_overlap = sum(overlap_width), .groups = "drop") %>%
+    left_join(data.frame(query_idx = 1:length(regions_gr), region_width = width(regions_gr)), by = "query_idx") %>%
+    mutate(proportion = total_overlap / region_width) %>%
+    # Average proportions across all regions for each HMM state
+    group_by(hmm_state) %>%
+    summarise(mean_proportion = mean(proportion, na.rm = TRUE), .groups = "drop") %>%
+    # Ensure all HMM states are present, filling missing with 0
+    tidyr::complete(hmm_state = unique(hmm$name), fill = list(mean_proportion = 0)) %>%
+    mutate(feature = feature_name) %>%
+    rename(proportion = mean_proportion) # Rename for consistency
+
+  return(region_proportions)
+}
+
+# --- Analysis Execution ---
+
+# Calculate genome background proportions
+genome_proportion <- calculate_hmm_genome_proportion(hmm)
+genome_proportion$feature <- "Genome"
+
+# Define features to analyze
+features_to_analyze <- c("exons", "upstream_flanks", "downstream_flanks") # Removed introns due to potential issues
+
+# Analyze DTU genes
+dtu_results <- lapply(features_to_analyze, function(feature) {
+  analyze_hmm_proportions(dtu_features[[feature]], hmm, paste0("DTU_", feature))
+})
+
+# Analyze canonical genes
+canonical_results <- lapply(features_to_analyze, function(feature) {
+  analyze_hmm_proportions(canonical_features[[feature]], hmm, paste0("canonical_", feature))
+})
+
+# Combine all results
+all_results <- bind_rows(c(dtu_results, canonical_results, list(genome_proportion)))
+all_results <- all_results %>% filter(!is.na(hmm_state)) # Remove rows with NA hmm_state
+
+# --- Enrichment Calculation & Visualization ---
+
+# Calculate enrichment relative to genome background
+calculate_enrichment <- function(data, background) {
+  # Ensure column names are consistent
+  background <- background %>% dplyr::select(hmm_state, proportion_bg = proportion)
+  data <- data %>% dplyr::select(hmm_state, proportion, feature)
+
+  merged <- left_join(data, background, by = "hmm_state") %>%
+    # Handle cases where a state might be missing in data or background
+    filter(!is.na(proportion) & !is.na(proportion_bg)) %>%
+    mutate(
+      # Add pseudo-count to avoid log2(0) or division by zero
+      log2_enrichment = log2((proportion + 1e-9) / (proportion_bg + 1e-9))
+    )
+  return(merged)
+}
+
+enrichment_df <- all_results %>%
+  filter(feature != "Genome") %>% # Exclude background from enrichment calculation itself
+  group_by(feature) %>%
+  do(calculate_enrichment(., genome_proportion)) %>%
+  ungroup()
+
+# Order HMM states (e.g., by average enrichment or a predefined functional order)
+hmm_order <- enrichment_df %>%
+  group_by(hmm_state) %>%
+  summarise(mean_enrichment = mean(log2_enrichment, na.rm = TRUE)) %>%
+  arrange(mean_enrichment) %>%
+  pull(hmm_state)
+
+enrichment_df$hmm_state <- factor(enrichment_df$hmm_state, levels = hmm_order)
+enrichment_df$feature <- factor(enrichment_df$feature, levels = unique(enrichment_df$feature)) # Maintain original feature order
+
+# Plot Enrichment Heatmap (Figure 5.3)
+p_enrichment_heatmap <- ggplot(enrichment_df, aes(x = hmm_state, y = feature, fill = log2_enrichment)) +
+  geom_tile(color = "grey80", size=0.1) +
+  scale_fill_gradient2(low = "#313695", mid = "#FFFFBF", high = "#A50026", midpoint = 0, name = "Log2 Enrichment") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        legend.position = "right",
+        plot.title = element_text(hjust=0.5, face="bold")) +
+  labs(title = "Enrichment of HMM States in Different Genomic Features (vs Genome)",
+       x = "HMM State", y = "Feature")
+
+print(p_enrichment_heatmap)
+ggsave("hmm_enrichment_heatmap_fig5.3.pdf", p_enrichment_heatmap, width = 8, height = 6)
+
+
+# --- Compare DTU vs Canonical Proportions (Figure 5.4) ---
+# Reshape for comparison
+comparison_data <- all_results %>%
+  filter(feature != "Genome") %>% # Exclude genome background
+  mutate(gene_group = ifelse(grepl("DTU", feature), "DTU", "Canonical"),
+         feature_type = gsub("DTU_|canonical_", "", feature)) %>%
+  dplyr::select(hmm_state, proportion, gene_group, feature_type)
+
+# Ensure factor levels are correct
+comparison_data$feature_type <- factor(comparison_data$feature_type, levels = features_to_analyze)
+
+# Plot proportions side-by-side
+p_proportion_comparison <- ggplot(comparison_data, aes(x = hmm_state, y = proportion, fill = gene_group)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  facet_wrap(~feature_type, scales = "free_y") + # Facet by feature type
+  scale_fill_manual(values = c("DTU" = "#E41A1C", "Canonical" = "#377EB8"), name="Gene Group") + # Red/Blue
+  scale_y_continuous(labels = scales::percent_format(scale = 100)) + # Show as percentage
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8),
+        legend.position = "top",
+        strip.text = element_text(face="bold")) +
+  labs(title = "Comparison of Proportions: DTU Genes vs Canonical Genes",
+       x = "HMM State", y = "Proportion of Feature Length")
+
+print(p_proportion_comparison)
+ggsave("hmm_proportion_comparison_dtu_vs_canonical_fig5.4.pdf", p_proportion_comparison, width = 10, height = 7)
+
+
+# --- Analyze HMM States by Switch Consequence (Figure 5.5) ---
+# Requires switch_info_with_genes data frame
+
+# Function to analyze HMM states for specific switch types
+analyze_switch_hmm <- function(switch_type, switch_info, all_exons, hmm, feature_name, chunk_size = 1e5) {
+  isoforms_with_switch <- switch_info$isoform_id[switch_info[[switch_type]] == 1]
+  regions_with_switch <- all_exons[all_exons$isoform_id %in% isoforms_with_switch] # Assuming analysis on exons
+
+  if (length(regions_with_switch) == 0) {
+    warning(paste("No regions found for switch type:", switch_type))
+    return(NULL)
+  }
+  # Use the existing analyze_hmm_proportions function
+  analyze_hmm_proportions(regions_with_switch, hmm, paste0(switch_type, "_", feature_name))
+}
+
+# Analyze for each switch type (example for exons)
+switch_types <- c("ES", "MEE", "MES", "IR", "A5", "A3", "ATSS", "ATTS")
+switch_results_exons <- lapply(switch_types, function(st) {
+  analyze_switch_hmm(st, switch_info_with_genes, all_exons, hmm, "exons")
+})
+
+# Combine results
+switch_hmm_df_exons <- bind_rows(switch_results_exons) %>%
+  mutate(switch_type = gsub("_exons", "", feature)) %>% # Extract switch type
+  filter(!is.na(hmm_state)) # Clean up
+
+# Calculate enrichment vs genome
+switch_enrichment_exons <- switch_hmm_df_exons %>%
+  group_by(switch_type) %>%
+  do(calculate_enrichment(., genome_proportion)) %>%
+  ungroup()
+
+# Order factors for plotting
+switch_enrichment_exons$hmm_state <- factor(switch_enrichment_exons$hmm_state, levels = hmm_order)
+switch_enrichment_exons$switch_type <- factor(switch_enrichment_exons$switch_type, levels = switch_types)
+
+# Plot heatmap for exons by switch type (similar to Fig 5.5)
+p_switch_heatmap_exons <- ggplot(switch_enrichment_exons, aes(x = hmm_state, y = switch_type, fill = log2_enrichment)) +
+  geom_tile(color = "grey80", size=0.1) +
+  scale_fill_gradient2(low = "#313695", mid = "#FFFFBF", high = "#A50026", midpoint = 0, name = "Log2 Enrichment") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        legend.position = "right",
+        plot.title = element_text(hjust=0.5, face="bold")) +
+  labs(title = "HMM State Enrichment by Switch Type (Exons vs Genome)",
+       x = "HMM State", y = "Switch Type")
+
+print(p_switch_heatmap_exons)
+ggsave("hmm_enrichment_by_switch_type_exons.pdf", p_switch_heatmap_exons, width = 8, height = 6)
+
+# Repeat the analysis for other features (upstream_flanks, downstream_flanks) if needed
+# by modifying the analyze_switch_hmm function call.
+
+```
+
+### `monaLisa.txt`: Motif Enrichment Analysis
+
+```R
+# --- monaLisa.txt ---
+# Purpose: Performs motif enrichment analysis using the monaLisa package.
+#          Identifies enriched sequence motifs (k-mers and known TF motifs from JASPAR)
+#          within specific genomic regions associated with DTU and/or DMRs.
+# Chapter Relevance: 5.5 DTU K-mer Enrichment Analysis
+
+# Load required libraries
+library(GenomicRanges)
+library(Biostrings)
+library(BSgenome.Mmusculus.UCSC.mm10) # Mouse genome sequence
+library(monaLisa)      # Core package for motif analysis
+library(JASPAR2020)    # Database of known TF binding motifs
+library(TFBSTools)     # For handling PWMs/PFMs
+library(ComplexHeatmap)# For plotting heatmaps
+library(circlize)      # For heatmap color scaling
+library(dplyr)
+library(data.table)    # For efficient data handling
+library(ggplot2)
+library(ggrepel)     # For non-overlapping labels
+library(BiocParallel)  # For parallel processing (optional)
+
+# --- Data Preparation ---
+# Assuming 'allRanges' list object is loaded, containing GRanges for various categories:
+# e.g., allRanges$midbrain$upstream, allRanges$forebrain$gene_body,
+#       allRanges$dmr (combined DMRs), allRanges$persistent_dmr$midbrain,
+#       allRanges$midbrain_dtu$gene_body, allRanges$forebrain_non_dtu$upstream,
+#       allRanges$midbrain_dtu_dmr$body, allRanges$splice_groups$ES$midbrain$upstream etc.
+
+# --- Motif Enrichment Analysis Function ---
+# Function to run monaLisa analysis for a given set of regions
+# Inputs: regions_gr = GRanges object of regions to analyze
+#         name = Descriptive name for the analysis group
+#         genome = BSgenome object
+#         kmer_length = Length of k-mers to analyze
+#         motif_db = Motif database (e.g., from JASPAR)
+#         bg_method = Background model ('genome', 'shuffle', 'local')
+#         cores = Number of cores for parallel processing
+# Output: List containing motif enrichment (se) and k-mer enrichment (sekm) results
+analyze_motifs_monalisa <- function(regions_gr, name,
+                                    genome = BSgenome.Mmusculus.UCSC.mm10,
+                                    kmer_length = 7,
+                                    motif_db_opts = list(matrixtype = "PWM", tax_group = "vertebrates", species = "Mus musculus"),
+                                    bg_method = "genome",
+                                    min_score_motif = "80%", # Minimum score for motif hits
+                                    motif_padj_threshold = 4, # -log10(padj) threshold for motifs
+                                    kmer_padj_threshold = 4, # -log10(padj) threshold for k-mers
+                                    cores = 1,
+                                    seed = 42) {
+
+  cat("\nAnalyzing:", name, "- Number of regions:", length(regions_gr), "\n")
+
+  if (length(regions_gr) < 10) { # Check for minimum number of regions
+    warning("Skipping analysis for ", name, " due to insufficient regions (< 10).")
+    return(NULL)
+  }
+
+  # Set up parallel parameters
+  bp_param <- BiocParallel::MulticoreParam(workers = cores, RNGseed = seed)
+
+  # Get sequences
+  sequences <- tryCatch(getSeq(genome, regions_gr), error = function(e) {
+    warning("Error getting sequences for ", name, ": ", conditionMessage(e))
+    return(NULL)
+  })
+  if (is.null(sequences)) return(NULL)
+
+  # Get motifs
+  pwms <- tryCatch(getMatrixSet(JASPAR2020, opts = motif_db_opts), error = function(e) {
+      warning("Error getting motifs: ", conditionMessage(e))
+      return(NULL)
+  })
+  if (is.null(pwms)) return(NULL)
+
+  # --- Motif Enrichment ---
+  cat("Running motif enrichment for", name, "...\n")
+  se_motif <- tryCatch({
+    calcBinnedMotifEnrR(seqs = sequences, pwmL = pwms, min.score = min_score_motif,
+                        background = bg_method, genome = genome, genome.oversample = 2, # Lower oversample for speed
+                        BPPARAM = bp_param)
+  }, error = function(e) {
+    warning("Error in calcBinnedMotifEnrR for ", name, ": ", conditionMessage(e))
+    NULL
+  })
+
+  se_motif_sig <- NULL
+  top_motifs_summary <- NULL
+  if (!is.null(se_motif)) {
+    sig_idx_motif <- which(assay(se_motif, "negLog10Padj")[, 1] > motif_padj_threshold)
+    if (length(sig_idx_motif) > 0) {
+      se_motif_sig <- se_motif[sig_idx_motif, ]
+      # Create summary dataframe
+      top_motifs_summary <- data.table(
+          Motif = rownames(se_motif_sig),
+          NegLog10Padj = assay(se_motif_sig, "negLog10Padj")[,1],
+          Log2Enr = assay(se_motif_sig, "log2enr")[,1],
+          Comparisons = name # Add the group name
+          )[order(-NegLog10Padj)]
+    } else {
+        cat("No significant motifs found for", name, "\n")
+    }
+  }
+
+  # --- K-mer Enrichment ---
+  cat("Running k-mer enrichment for", name, "...\n")
+  se_kmer <- tryCatch({
+    calcBinnedKmerEnr(seqs = sequences, kmerLen = kmer_length, includeRevComp = TRUE,
+                       background = bg_method, genome = genome, genome.oversample = 2, # Lower oversample for speed
+                       BPPARAM = bp_param)
+  }, error = function(e) {
+    warning("Error in calcBinnedKmerEnr for ", name, ": ", conditionMessage(e))
+    NULL
+  })
+
+  se_kmer_sig <- NULL
+  top_kmers_summary <- NULL
+  if (!is.null(se_kmer)) {
+    sig_idx_kmer <- which(assay(se_kmer, "negLog10Padj")[, 1] > kmer_padj_threshold)
+     if (length(sig_idx_kmer) > 0) {
+        se_kmer_sig <- se_kmer[sig_idx_kmer, ]
+        # Create summary dataframe
+        top_kmers_summary <- data.table(
+            Kmer = rownames(se_kmer_sig),
+            NegLog10Padj = assay(se_kmer_sig, "negLog10Padj")[,1],
+            Log2Enr = assay(se_kmer_sig, "log2enr")[,1],
+            Comparisons = name # Add the group name
+            )[order(-NegLog10Padj)]
+     } else {
+        cat("No significant k-mers found for", name, "\n")
+     }
+  }
+
+  return(list(motif_enrichment = se_motif_sig, top_motifs = top_motifs_summary,
+              kmer_enrichment = se_kmer_sig, top_kmers = top_kmers_summary))
+}
+
+
+# --- Define Analysis Groups ---
+# Create a list of GRanges objects to analyze, named descriptively
+analysis_groups <- list(
+  # Midbrain
+  Midbrain_Upstream = allRanges$midbrain$upstream,
+  Midbrain_Body = allRanges$midbrain$gene_body,
+  Midbrain_Downstream = allRanges$midbrain$downstream,
+  Midbrain_DTU_Upstream = allRanges$midbrain_dtu$upstream,
+  Midbrain_DTU_Body = allRanges$midbrain_dtu$gene_body,
+  Midbrain_DTU_Downstream = allRanges$midbrain_dtu$downstream,
+  Midbrain_NonDTU_Upstream = allRanges$midbrain_non_dtu$upstream,
+  Midbrain_NonDTU_Body = allRanges$midbrain_non_dtu$gene_body,
+  Midbrain_NonDTU_Downstream = allRanges$midbrain_non_dtu$downstream,
+  Midbrain_DMR_Upstream = allRanges$dmr_midbrain$upstream, # Assuming DMR data is split by tissue
+  Midbrain_DMR_Body = allRanges$dmr_midbrain$body,
+  Midbrain_DMR_Downstream = allRanges$dmr_midbrain$downstream,
+  Midbrain_DTU_DMR_Upstream = allRanges$midbrain_dtu_dmr$upstream,
+  Midbrain_DTU_DMR_Body = allRanges$midbrain_dtu_dmr$body,
+  Midbrain_DTU_DMR_Downstream = allRanges$midbrain_dtu_dmr$downstream,
+  Midbrain_PersistentDMR_Upstream = allRanges$persistent_dmr$midbrain$upstream,
+  Midbrain_PersistentDMR_Body = allRanges$persistent_dmr$midbrain$body,
+  Midbrain_PersistentDMR_Downstream = allRanges$persistent_dmr$midbrain$downstream,
+  # Forebrain (similar structure)
+  Forebrain_Upstream = allRanges$forebrain$upstream,
+  Forebrain_Body = allRanges$forebrain$gene_body,
+  Forebrain_Downstream = allRanges$forebrain$downstream,
+  Forebrain_DTU_Upstream = allRanges$forebrain_dtu$upstream,
+  Forebrain_DTU_Body = allRanges$forebrain_dtu$gene_body,
+  Forebrain_DTU_Downstream = allRanges$forebrain_dtu$downstream,
+  Forebrain_NonDTU_Upstream = allRanges$forebrain_non_dtu$upstream,
+  Forebrain_NonDTU_Body = allRanges$forebrain_non_dtu$gene_body,
+  Forebrain_NonDTU_Downstream = allRanges$forebrain_non_dtu$downstream,
+  Forebrain_DMR_Upstream = allRanges$dmr_forebrain$upstream,
+  Forebrain_DMR_Body = allRanges$dmr_forebrain$body,
+  Forebrain_DMR_Downstream = allRanges$dmr_forebrain$downstream,
+  Forebrain_DTU_DMR_Upstream = allRanges$forebrain_dtu_dmr$upstream,
+  Forebrain_DTU_DMR_Body = allRanges$forebrain_dtu_dmr$body,
+  Forebrain_DTU_DMR_Downstream = allRanges$forebrain_dtu_dmr$downstream,
+  Forebrain_PersistentDMR_Upstream = allRanges$persistent_dmr$forebrain$upstream,
+  Forebrain_PersistentDMR_Body = allRanges$persistent_dmr$forebrain$body,
+  Forebrain_PersistentDMR_Downstream = allRanges$persistent_dmr$forebrain$downstream
+  # Add Splice Groups if needed
+)
+
+# Filter out any groups with zero length ranges
+analysis_groups <- analysis_groups[sapply(analysis_groups, length) > 0]
+
+# --- Run Analysis ---
+# Run the analysis function for each group
+# Use more cores if available and appropriate BiocParallel backend is set up
+monalisa_results <- lapply(names(analysis_groups), function(name) {
+  analyze_motifs_monalisa(analysis_groups[[name]], name, cores = 4) # Adjust cores as needed
+})
+names(monalisa_results) <- names(analysis_groups)
+
+# --- Combine and Summarize Results ---
+# Combine top k-mers and motifs from all analyses
+all_top_kmers <- bind_rows(lapply(monalisa_results, `[[`, "top_kmers"))
+all_top_motifs <- bind_rows(lapply(monalisa_results, `[[`, "top_motifs"))
+
+# Save combined results
+fwrite(all_top_kmers, "all_top_enriched_kmers.csv")
+fwrite(all_top_motifs, "all_top_enriched_motifs.csv")
+
+# --- Visualization (Example: Figure 5.16 / 5.17) ---
+# Select relevant data for the plot (e.g., Upstream DMR, DTU, DTU-DMR, Non-DTU)
+plot_data <- bind_rows(
+    monalisa_results[["Midbrain_DMR_Upstream"]]$top_motifs,
+    monalisa_results[["Midbrain_DTU_Upstream"]]$top_motifs,
+    monalisa_results[["Midbrain_DTU_DMR_Upstream"]]$top_motifs,
+    monalisa_results[["Midbrain_NonDTU_Upstream"]]$top_motifs,
+    monalisa_results[["Forebrain_DMR_Upstream"]]$top_motifs,
+    monalisa_results[["Forebrain_DTU_Upstream"]]$top_motifs,
+    monalisa_results[["Forebrain_DTU_DMR_Upstream"]]$top_motifs,
+    monalisa_results[["Forebrain_NonDTU_Upstream"]]$top_motifs
+    # Add Body and Downstream data similarly if needed
+    ) %>%
+    filter(!is.na(Motif)) %>% # Filter out potential NAs if analysis failed for some groups
+    # Create simpler category names for plotting
+    mutate(Category = case_when(
+                grepl("NonDTU", Comparisons) ~ "Non-DTU",
+                grepl("DTU_DMR", Comparisons) ~ "DTU-DMR",
+                grepl("DTU", Comparisons) ~ "DTU",
+                grepl("DMR", Comparisons) ~ "DMR",
+                TRUE ~ "Other"
+                ),
+           Region = case_when(
+                grepl("Upstream", Comparisons) ~ "Upstream",
+                grepl("Body", Comparisons) ~ "Body",
+                grepl("Downstream", Comparisons) ~ "Downstream",
+                TRUE ~ "Other"
+                ),
+           Tissue = ifelse(grepl("Midbrain", Comparisons), "Midbrain", "Forebrain")
+           ) %>%
+    # Aggregate: Max significance and Mean enrichment per Motif/Category/Region/Tissue
+    group_by(Motif, Category, Region, Tissue) %>%
+    summarise(Max_NegLog10Padj = max(NegLog10Padj, na.rm = TRUE),
+              Mean_Log2Enr = mean(Log2Enr, na.rm = TRUE),
+              .groups = "drop") %>%
+    filter(is.finite(Max_NegLog10Padj) & is.finite(Mean_Log2Enr)) # Ensure finite values
+
+# Scatter plot (similar to Fig 5.17)
+p_scatter <- ggplot(plot_data, aes(x = Mean_Log2Enr, y = Max_NegLog10Padj)) +
+  geom_point(aes(color = Category, shape = Region), size = 3, alpha = 0.8) +
+  geom_text_repel(
+      aes(label = Motif),
+      data = subset(plot_data, Max_NegLog10Padj > 50 | abs(Mean_Log2Enr) > 0.2), # Label top points
+      size = 2.5, max.overlaps = 15, box.padding = 0.4
+  ) +
+  scale_color_brewer(palette = "Set1", name="Category") +
+  scale_shape_manual(values = c("Upstream" = 17, "Body" = 16, "Downstream" = 15, "Other"=4), name="Region") +
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", color="grey50") + # Add p=0.05 line
+  theme_minimal(base_size = 10) +
+  labs(title = "Motif Enrichment and Significance by Category and Region",
+       x = "Mean Log2 Enrichment", y = "Max -log10(Adjusted p-value)") +
+  theme(legend.position = "right")
+
+print(p_scatter)
+ggsave("motif_enrichment_scatter_fig5.17_style.pdf", p_scatter, width = 10, height = 8)
+
+# Heatmap plot (similar to Fig 5.18 - requires reshaping)
+# Reshape for heatmap: Kmers vs Regions
+heatmap_data <- all_top_kmers %>%
+    # Select top ~100 overall significant k-mers for better visualization
+    group_by(Kmer) %>%
+    filter(max(NegLog10Padj) > 10) %>% # Example threshold
+    ungroup() %>%
+    select(Kmer, Comparisons, Log2Enr) %>%
+    pivot_wider(names_from = Comparisons, values_from = Log2Enr, values_fill = 0) # Fill missing with 0
+
+kmer_matrix <- as.matrix(heatmap_data[,-1])
+rownames(kmer_matrix) <- heatmap_data$Kmer
+
+# Create annotations
+column_annotation_df <- data.frame(
+    Category = sapply(colnames(kmer_matrix), function(x) str_extract(x, "(DTU_DMR|DMR|DTU|NonDTU|PersistentDMR|ES|MEE|MES|IR|A5|A3|ATSS|ATTS)")),
+    Location = sapply(colnames(kmer_matrix), function(x) str_extract(x, "(Upstream|Body|Downstream)")),
+    Tissue = ifelse(grepl("Midbrain", colnames(kmer_matrix)), "Midbrain", "Forebrain")
+)
+rownames(column_annotation_df) <- colnames(kmer_matrix)
+
+# Define colors
+category_colors <- setNames(brewer.pal(n = length(unique(column_annotation_df$Category)), name = "Set1"), unique(column_annotation_df$Category))
+location_colors <- setNames(brewer.pal(n = 3, name = "Pastel1"), c("Upstream", "Body", "Downstream"))
+tissue_colors <- setNames(c("red", "blue"), c("Forebrain", "Midbrain"))
+ann_colors <- list(Category = category_colors, Location = location_colors, Tissue=tissue_colors)
+
+# Generate Heatmap
+p_heatmap <- pheatmap(kmer_matrix,
+                      show_rownames = FALSE,
+                      show_colnames = TRUE,
+                      cluster_rows = TRUE,
+                      cluster_cols = TRUE,
+                      clustering_method = "ward.D2",
+                      annotation_col = column_annotation_df,
+                      annotation_colors = ann_colors,
+                      color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100), # Example palette
+                      main = "K-mer Enrichment Across Genomic Regions",
+                      fontsize_col = 8, angle_col = 90,
+                      filename="kmer_enrichment_heatmap_fig5.18_style.pdf", width=12, height=10)
+
+print("MonaLisa analysis complete.")
+
+```
+
+### `shape_analysis_post_analysis.txt`: DNA Shape Analysis
+
+```R
+# --- shape_analysis_post_analysis.txt ---
+# Purpose: Analyzes DNA shape parameters (MGW, HelT, ProT, Roll, EP) using DNAshapeR
+#          predictions. Compares shape parameters between methylated and unmethylated
+#          states for DTU genes versus control (non-DTU) genes across different
+#          genomic regions (upstream, gene body, downstream).
+# Chapter Relevance: 5.5.2 Sequence Topology: DNA Shape Analysis
+
+# Load required libraries
+library(data.table) # For efficient data reading (fread)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(effectsize) # For Cohen's d calculation
+library(rstatix)    # Provides pipe-friendly stats functions
+library(patchwork)  # For combining plots
+
+# --- Data Loading ---
+# Define column names explicitly as fread might not infer them correctly without header
+col_names <- c("gene_name", "region_type", "chr", "start", "end", "strand",
+               "has_methylation", "num_meth_sites", "MGW", "HelT", "ProT", "Roll", "EP")
+
+# Import the data files using fread, skipping the header row
+dtu_methylated <- fread("dna_shape_dtu_methylated_final.csv", col.names = col_names, skip = 1)
+dtu_unmethylated <- fread("dna_shape_dtu_non_methylated_final.csv", col.names = col_names, skip = 1) # Renamed from _replaced
+control_methylated <- fread("dna_shape_control_methylated_final.csv", col.names = col_names, skip = 1) # Renamed from non_dtu
+control_unmethylated <- fread("dna_shape_control_non_methylated_final.csv", col.names = col_names, skip = 1)
+
+# Add grouping information
+dtu_methylated <- dtu_methylated %>% mutate(group = "DTU", methylation_state = "Methylated")
+dtu_unmethylated <- dtu_unmethylated %>% mutate(group = "DTU", methylation_state = "Unmethylated")
+control_methylated <- control_methylated %>% mutate(group = "Control", methylation_state = "Methylated")
+control_unmethylated <- control_unmethylated %>% mutate(group = "Control", methylation_state = "Unmethylated")
+
+# Combine data for easier processing
+all_shape_data <- bind_rows(dtu_methylated, dtu_unmethylated, control_methylated, control_unmethylated)
+
+# --- Helper Functions ---
+
+# Function to parse shape parameter strings and calculate mean/sd
+# Input: shape_string = character string of space/pipe separated values
+# Output: list containing mean and sd
+parse_and_summarize <- function(shape_string) {
+  # Check if input is already numeric or NA
+  if (is.numeric(shape_string) || is.na(shape_string) || shape_string == "") {
+    return(list(mean = NA_real_, sd = NA_real_))
+  }
+  # Replace pipes with spaces and split
+  values <- as.numeric(unlist(strsplit(gsub("\\|", " ", shape_string), "\\s+"))) # Use \\s+ for robust splitting
+  values <- values[!is.na(values)] # Remove NAs resulting from conversion
+  if (length(values) == 0) {
+    return(list(mean = NA_real_, sd = NA_real_))
+  } else if (length(values) == 1) {
+    return(list(mean = values, sd = 0)) # SD is 0 for a single value
+  } else {
+    return(list(mean = mean(values), sd = sd(values)))
+  }
+}
+
+# Function to analyze shape differences between methylated and unmethylated states
+# Inputs: data = combined dataframe, param = shape parameter name
+# Output: data frame with summary statistics and test results
+analyze_shape_param <- function(data, param) {
+  param_summary <- data %>%
+    rowwise() %>%
+    mutate(summary = list(parse_and_summarize(!!sym(param)))) %>%
+    unnest_wider(summary) %>%
+    ungroup() %>%
+    select(gene_name, region_type, group, methylation_state, mean, sd)
+
+  # Perform tests comparing methylated vs unmethylated within each group/region
+  stats_results <- param_summary %>%
+    filter(!is.na(mean)) %>% # Ensure we have data for comparison
+    group_by(group, region_type) %>%
+    filter(n_distinct(methylation_state) == 2) %>% # Ensure both states are present
+    do(
+      if (nrow(.) > 2) { # Need enough data points for tests
+        wilcox_test_res <- tryCatch(wilcox.test(mean ~ methylation_state, data = .), error = function(e) NULL)
+        cohen_d_res <- tryCatch(cohens_d(mean ~ methylation_state, data = .), error = function(e) NULL)
+        bind_cols(
+          Parameter = param,
+          Methylated_Mean = mean(.$mean[.$methylation_state == "Methylated"]),
+          Unmethylated_Mean = mean(.$mean[.$methylation_state == "Unmethylated"]),
+          Methylated_SD = mean(.$sd[.$methylation_state == "Methylated"]), # Mean of SDs
+          Unmethylated_SD = mean(.$sd[.$methylation_state == "Unmethylated"]), # Mean of SDs
+          Wilcox_pvalue = ifelse(!is.null(wilcox_test_res), wilcox_test_res$p.value, NA),
+          Effect_Size_d = ifelse(!is.null(cohen_d_res), cohen_d_res$Cohens_d, NA)
+        )
+      } else { NULL }
+    ) %>% ungroup()
+
+  return(stats_results)
+}
+
+
+# --- Analysis Execution ---
+shape_params <- c("MGW", "HelT", "ProT", "Roll", "EP")
+
+# Analyze each shape parameter across all data
+all_results_list <- lapply(shape_params, function(p) analyze_shape_param(all_shape_data, p))
+all_shape_results <- bind_rows(all_results_list)
+
+# Adjust p-values for multiple testing (globally)
+all_shape_results <- all_shape_results %>%
+  filter(!is.na(Wilcox_pvalue)) %>% # Remove rows where tests couldn't be performed
+  mutate(FDR_pvalue = p.adjust(Wilcox_pvalue, method = "BH"))
+
+# Function to assign significance stars
+get_significance <- function(p_value) {
+  case_when(
+    p_value < 0.001 ~ "***",
+    p_value < 0.01  ~ "**",
+    p_value < 0.05  ~ "*",
+    TRUE            ~ "ns"
+  )
+}
+all_shape_results$Significance <- sapply(all_shape_results$FDR_pvalue, get_significance)
+
+# --- Output Results ---
+
+# Function to format results table
+print_results_table <- function(results, caption) {
+  cat("\n", caption, "\n")
+  results %>%
+    arrange(region_type, Parameter, group) %>%
+    mutate(across(c(Effect_Size_d, Methylated_Mean, Unmethylated_Mean, Methylated_SD, Unmethylated_SD), ~round(., 3)),
+           FDR_pvalue = format.pval(FDR_pvalue, digits = 2, eps = 0.001)) %>%
+    dplyr::select(Region = region_type, Parameter, Group=group, Methylated_Mean, Unmethylated_Mean,
+           Methylated_SD, Unmethylated_SD, Effect_Size = Effect_Size_d, FDR_pvalue, Significance) %>%
+    print(n = Inf)
+}
+
+# Print results (Tables 5.7 and 5.8 style)
+print_results_table(filter(all_shape_results, group == "DTU"), "DNA Shape Changes in DTU Genes (Methylated vs Unmethylated)")
+print_results_table(filter(all_shape_results, group == "Control"), "DNA Shape Changes in Control Genes (Methylated vs Unmethylated)")
+
+# --- Visualization ---
+# Plot effect sizes for easier comparison
+p_effect_size <- ggplot(all_shape_results, aes(x = Parameter, y = Effect_Size_d, fill = group)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  geom_text(aes(label = Significance, y = Effect_Size_d + 0.02 * sign(Effect_Size_d)), # Position labels slightly above/below bars
+            position = position_dodge(width = 0.8), size = 3, vjust=0.5) +
+  facet_wrap(~region_type) +
+  scale_fill_brewer(palette = "Pastel1", name = "Gene Group") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "DNA Shape Parameter Effect Sizes (Methylated vs Unmethylated)",
+       y = "Cohen's d Effect Size", x = "Shape Parameter")
+
+print(p_effect_size)
+ggsave("dna_shape_effect_sizes.pdf", p_effect_size, width = 10, height = 6)
+
+# --- Direct Comparison DTU vs Control ---
+# Function for direct comparison
+compare_dtu_control_shape <- function(data, param, state) {
+    comp_data <- data %>% filter(methylation_state == state)
+    dtu_vals <- comp_data %>% filter(group == "DTU") %>% pull(mean)
+    control_vals <- comp_data %>% filter(group == "Control") %>% pull(mean)
+
+    if(length(dtu_vals) < 3 || length(control_vals) < 3) return(NULL)
+
+    wilcox_test_res <- tryCatch(wilcox.test(dtu_vals, control_vals), error = function(e) NULL)
+    cohen_d_res <- tryCatch(cohens_d(dtu_vals, control_vals), error = function(e) NULL)
+
+    data.frame(
+        Parameter = param,
+        Methylation_State = state,
+        DTU_Mean = mean(dtu_vals, na.rm=T), Control_Mean = mean(control_vals, na.rm=T),
+        DTU_SD = sd(dtu_vals, na.rm=T), Control_SD = sd(control_vals, na.rm=T),
+        Wilcox_p = ifelse(!is.null(wilcox_test_res), wilcox_test_res$p.value, NA),
+        Effect_Size_d = ifelse(!is.null(cohen_d_res), cohen_d_res$Cohens_d, NA)
+    )
+}
+
+# Perform comparisons for methylated and unmethylated states
+param_summary_for_comp <- all_shape_data %>%
+    rowwise() %>%
+    mutate(summary = list(parse_and_summarize(!!sym(param)))) %>% # Needs param defined in a loop
+    # This structure is inefficient; better to reshape first
+    pivot_longer(cols=all_of(shape_params), names_to="Parameter", values_to="shape_string") %>%
+    rowwise() %>%
+    mutate(summary = list(parse_and_summarize(shape_string))) %>%
+    unnest_wider(summary) %>%
+    ungroup() %>%
+    select(-shape_string)
+
+
+direct_comp_results <- bind_rows(
+    lapply(shape_params, function(p) compare_dtu_control_shape(filter(param_summary_for_comp, Parameter==p), p, "Methylated")),
+    lapply(shape_params, function(p) compare_dtu_control_shape(filter(param_summary_for_comp, Parameter==p), p, "Unmethylated"))
+) %>% filter(!is.na(Wilcox_p))
+
+direct_comp_results$FDR_p <- p.adjust(direct_comp_results$Wilcox_p, method="BH")
+direct_comp_results$Significance <- sapply(direct_comp_results$FDR_p, get_significance)
+
+print_results_table(direct_comp_results, "Direct Comparison DTU vs Control Genes")
+
+```
+
+# --- Combined Gviz Plotting Script ---
+# Purpose: Uses the Gviz package to create detailed genomic visualizations,
+#          integrating methylation data (points and smoothed lines) with gene models,
+#          HMM chromatin states, genomic coordinates, and potentially other tracks.
+#          Compares methylation patterns between two samples/conditions for a specific gene.
+# Chapter Relevance: Chapter 5 (Used for detailed visualization of specific gene examples like Shtn1 or Vcan)
+
+# Load required libraries (ensure these are installed and loaded before running)
+library(Gviz)
+library(GenomicRanges)
+library(rtracklayer)   # For importing BED files (like HMM)
+library(data.table)    # Optional, used in some related scripts but not strictly required by the plot function itself
+library(zoo)           # For rolling mean calculation (smoothing)
+library(RColorBrewer)  # For color palettes
+library(dplyr)         # For data manipulation (though base R is mostly used here)
+library(purrr)         # For map functions (though base apply functions could also be used)
+
+# --- Gviz Plotting Function Definition ---
+
+#' Plot Gene Methylation Comparison using Gviz
+#'
+#' Creates a multi-track Gviz plot comparing methylation patterns for a specific gene
+#' between two samples/conditions, alongside gene models and HMM states.
+#'
+#' @param gene_id Character string: The gene symbol or ID to plot.
+#' @param sample1_data GRanges object: Methylation data for the first sample/condition.
+#'                     Must contain a metadata column named 'methylation_level' (numeric, 0-100).
+#' @param sample2_data GRanges object: Methylation data for the second sample/condition.
+#'                     Must contain a metadata column named 'methylation_level'.
+#' @param sample1_name Character string: Label for the first sample/condition.
+#' @param sample2_name Character string: Label for the second sample/condition.
+#' @param exons_gr GRanges object: Contains exon information for all genes.
+#'                 Must have 'gene_id' metadata column matching the input `gene_id`.
+#'                 'transcript_id' is optional for grouping exons by transcript.
+#' @param hmm GRanges object: Contains HMM chromatin state information.
+#'            Must have a 'name' metadata column specifying the state type.
+#' @param genome Character string: Genome build identifier (e.g., "mm10", "hg38").
+#' @param window_size Integer: The window size (number of CpG sites) for calculating the rolling mean (smoothing).
+#' @param flank_width Integer: The width (in base pairs) of the flanking regions to include upstream and downstream of the gene body.
+#'
+#' @return This function primarily generates a plot using `plotTracks`. It doesn't return a specific R object but displays the plot.
+#' @export
+#'
+#' @examples
+#' # # Assuming dummy_meth1, dummy_meth2, all_exons, hmm are loaded GRanges objects
+#' # plot_gene_methylation_comparison_gviz("Shtn1",
+#' #                                      dummy_meth1, dummy_meth2,
+#' #                                      "Forebrain_E10.5", "Midbrain_E10.5",
+#' #                                      all_exons, hmm, genome="mm10",
+#' #                                      window_size=10, flank_width=1000)
+plot_gene_methylation_comparison_gviz <- function(gene_id, sample1_data, sample2_data, sample1_name, sample2_name, exons_gr, hmm, genome = "mm10", window_size = 50, flank_width = 2000) {
+
+  # --- 1. Determine Gene Region ---
+  # Filter exons for the target gene
+  gene_exons <- exons_gr[mcols(exons_gr)$gene_id == gene_id]
+  if (length(gene_exons) == 0) {
+    stop(paste("No exons found for gene:", gene_id))
+  }
+  # Define the full range covered by the gene's exons
+  gene_range <- range(gene_exons)
+  chr <- as.character(seqnames(gene_range))[1] # Get chromosome name
+
+  # Define plot region including flanks, ensuring start is not negative
+  plot_start <- max(1, start(gene_range) - flank_width)
+  plot_end <- end(gene_range) + flank_width
+
+  cat("Plotting region:", chr, ":", plot_start, "-", plot_end, "for gene", gene_id, "\n")
+
+  # --- 2. Create Basic Gviz Tracks ---
+  # Genome axis track showing coordinates
+  gtrack <- GenomeAxisTrack(name = "Scale")
+  # Ideogram track showing chromosome context
+  itrack <- IdeogramTrack(genome = genome, chromosome = chr)
+
+  # --- 3. Create Gene Model Track ---
+  # Group exons by transcript for better visualization if transcript info is available
+  if ("transcript_id" %in% names(mcols(gene_exons))) {
+      gene_model <- GeneRegionTrack(gene_exons,
+                                    genome = genome, chromosome = chr, name = "Gene Model",
+                                    transcriptAnnotation = "transcript_id", # Use transcript IDs as labels
+                                    group = mcols(gene_exons)$transcript_id, # Group exons by transcript
+                                    showId = TRUE, # Show transcript IDs on the plot
+                                    cex.id = 0.6, # Size of transcript IDs
+                                    cex.group = 0.7, # Adjust grouping label size
+                                    just.group = "left") # Justification of grouping labels
+  } else {
+      # Fallback if no transcript_id, show gene_id (less informative if multiple isoforms)
+      gene_model <- GeneRegionTrack(gene_exons,
+                                    genome = genome, chromosome = chr, name = "Gene Model",
+                                    showId = TRUE, cex.id = 0.6) # Show gene_id
+  }
+  # Set display parameters for the gene model track
+  displayPars(gene_model) <- list(background.title = "darkblue", fontcolor.title="white", col.line = "darkblue", col = "darkblue")
+
+
+  # --- 4. Create Annotation Track for Flanks and Gene Body ---
+  # Defines the upstream, gene body, and downstream regions visually
+  atrack <- AnnotationTrack(
+    start = c(plot_start, start(gene_range), end(gene_range)),
+    end = c(start(gene_range), end(gene_range), plot_end),
+    chromosome = chr,
+    genome = genome,
+    name = "Regions",
+    id = c("Upstream", "Gene Body", "Downstream"), # Labels for the regions
+    fill = c("#ABDDA4", "#FDAE61", "#2B83BA"), # Example distinct colors: Green, Orange, Blue
+    feature = c("Flank", "Body", "Flank"), # Optional feature type metadata
+    showFeatureId = TRUE, # Show the id labels ('Upstream', 'Gene Body', 'Downstream')
+    cex = 0.7 # Adjust label size
+  )
+  # Set display parameters for the annotation track
+  displayPars(atrack) <- list(background.title = "darkgrey", fontcolor.title="white")
+
+  # --- 5. Create HMM State Track ---
+  hmm_track <- NULL # Initialize as NULL in case no HMM data overlaps
+  # Subset HMM data for the plotting region
+  hmm_subset <- hmm[seqnames(hmm) == chr & start(hmm) < plot_end & end(hmm) > plot_start]
+
+  if (length(hmm_subset) > 0) {
+      # Assign colors to HMM states dynamically
+      unique_states <- sort(unique(hmm_subset$name))
+      n_states <- length(unique_states)
+      # Use a color palette suitable for the number of states
+      if (n_states <= 9) {
+          # Use a qualitative palette for fewer states
+          state_colors <- setNames(brewer.pal(max(3, n_states), "Set1"), unique_states) # Ensure at least 3 colors
+      } else if (n_states <= 12) {
+          state_colors <- setNames(brewer.pal(n_states, "Paired"), unique_states)
+      } else {
+          # Fallback for many states using a spectral palette (colors might be less distinct)
+          state_colors <- setNames(colorRampPalette(brewer.pal(11, "Spectral"))(n_states), unique_states)
+          warning(paste("More than 12 HMM states (", n_states, "), using spectral palette. Colors may not be optimally distinct."))
+      }
+
+      # Create the AnnotationTrack for HMM states
+      hmm_track <- AnnotationTrack(hmm_subset,
+                                   genome = genome, chromosome = chr, name = "HMM States",
+                                   # Use 'id' for hover text/labels, 'group' for coloring/legend
+                                   id = hmm_subset$name,
+                                   group = hmm_subset$name,
+                                   fill = state_colors[hmm_subset$name], # Assign colors based on state name
+                                   stacking = "dense", # Attempt to pack states densely
+                                   showFeatureId = FALSE, # Don't show state name directly on track item
+                                   cex.title = 0.8, # Adjust track title size
+                                   background.title = "darkgrey", fontcolor.title="white") # Title background
+
+       # Add display parameters to control appearance (e.g., legend text size)
+      displayPars(hmm_track) <- list(
+         cex.group = 0.6, # Adjust size of legend text
+         just.group = "right", # Justification in legend
+         showId = TRUE # Show state name on mouse hover (if supported by the plotting device/viewer)
+      )
+
+  } else {
+    cat("Warning: No HMM states found in the plotting region for gene", gene_id, "\n")
+    # Create an empty placeholder track if no HMM data overlaps the region
+    hmm_track <- AnnotationTrack(name = "HMM States (Empty)", genome = genome, chromosome = chr,
+                                 background.title = "darkgrey", fontcolor.title="white")
+  }
+
+
+  # --- 6. Process Methylation Data and Create Individual Data Tracks ---
+  # Helper function to process methylation data for one sample and create Gviz tracks
+  process_methylation <- function(methylation_gr, sample_name, color) {
+    # Subset methylation data for the plot region
+    meth_subset <- methylation_gr[seqnames(methylation_gr) == chr &
+                                    start(methylation_gr) >= plot_start &
+                                    end(methylation_gr) <= plot_end]
+
+    # Check if any data remains after subsetting
+    if (length(meth_subset) == 0) {
+      warning(paste("No methylation data found for", sample_name, "in the plotting region."))
+      # Return named list with empty placeholder tracks
+      return(list(points = DataTrack(name = paste("Methylation %", sample_name, "(Empty)"), genome = genome, chromosome = chr, background.title = "lightgrey", fontcolor.title="white"),
+                  smooth = DataTrack(name = paste("Smoothed", sample_name, "(Empty)"), genome = genome, chromosome = chr, background.title = "lightgrey", fontcolor.title="white")))
+    }
+
+    # Ensure strand is '*' for DataTrack compatibility (methylation is usually unstranded)
+    strand(meth_subset) <- "*"
+
+    # Check for methylation level column and convert to numeric
+    if (!"methylation_level" %in% names(mcols(meth_subset))) {
+      stop(paste("'methylation_level' column not found in methylation data for", sample_name))
+    }
+    mcols(meth_subset)$methylation_level <- as.numeric(mcols(meth_subset)$methylation_level)
+
+    # Filter out NAs in methylation level AFTER conversion
+    meth_subset <- meth_subset[!is.na(mcols(meth_subset)$methylation_level)]
+
+    # Handle case where filtering removed all data points
+    if (length(meth_subset) == 0) {
+       warning(paste("No valid (non-NA) methylation data points found for", sample_name, "in the plotting region."))
+       return(list(points = DataTrack(name = paste("Methylation %", sample_name, "(Empty)"), genome = genome, chromosome = chr, background.title = "lightgrey", fontcolor.title="white"),
+                  smooth = DataTrack(name = paste("Smoothed", sample_name, "(Empty)"), genome = genome, chromosome = chr, background.title = "lightgrey", fontcolor.title="white")))
+    }
+
+    # Sort by position, crucial for smoothing and line plots
+    meth_subset <- sort(meth_subset)
+
+    # --- Create Point Track (Raw Data) ---
+    dtrack_points <- DataTrack(meth_subset,
+                               genome = genome,
+                               chromosome = chr,
+                               name = paste("Methylation %", sample_name),
+                               type = "p", # p for points
+                               cex = 0.5,   # Point size
+                               pch = 20,    # Point type (filled circle)
+                               ylim = c(0, 100), # Y-axis limits (0-100%)
+                               col = color, # Point color
+                               data = "methylation_level", # Specify the data column
+                               cex.title = 0.8, background.title = "lightgrey", fontcolor.title="white")
+
+
+    # --- Create Smoothed Line Track ---
+    smooth_methylation <- NA_real_ # Initialize
+    smooth_gr <- GRanges()         # Initialize empty GRanges
+
+    # Calculate rolling mean only if enough data points exist for the window size
+    if (length(meth_subset) >= window_size) {
+        # Calculate smoothed methylation levels using rolling mean
+        # align="center" helps keep the smoothed line centered on the window
+        smooth_methylation <- rollmean(mcols(meth_subset)$methylation_level, k = window_size, fill = NA, align = "center")
+
+        # Create a GRanges object for smoothed data, removing NAs introduced by rollmean at ends
+        valid_smooth_indices <- !is.na(smooth_methylation)
+        if(any(valid_smooth_indices)) {
+             smooth_gr <- GRanges(seqnames = seqnames(meth_subset)[valid_smooth_indices],
+                                 ranges = ranges(meth_subset)[valid_smooth_indices],
+                                 strand = "*",
+                                 # Use the calculated smoothed values
+                                 methylation_level = smooth_methylation[valid_smooth_indices])
+        }
+
+    } else {
+        # Warning if smoothing is not possible
+        cat("Warning: Not enough data points (", length(meth_subset), ") for smoothing with window size", window_size, "for sample", sample_name, "\n")
+    }
+
+    # Create the DataTrack for smoothed data only if smooth_gr has data
+    if (length(smooth_gr) > 0) {
+         dtrack_smooth <- DataTrack(smooth_gr,
+                                   genome = genome,
+                                   chromosome = chr,
+                                   name = paste("Smoothed", sample_name),
+                                   type = "l", # l for line
+                                   lwd = 1.5,   # Line width
+                                   ylim = c(0, 100),
+                                   col = color, # Line color
+                                   data = "methylation_level", # Specify the data column
+                                   cex.title=0.8, background.title="lightgrey", fontcolor.title="white")
+    } else {
+        # Create an empty placeholder track if smoothing failed or wasn't possible
+        dtrack_smooth <- DataTrack(name = paste("Smoothed", sample_name, "(Empty)"), genome = genome, chromosome = chr,
+                                   background.title = "lightgrey", fontcolor.title="white")
+    }
+
+    # Return both the point and smoothed tracks for this sample
+    return(list(points = dtrack_points, smooth = dtrack_smooth))
+  } # End of process_methylation helper function
+
+  # --- 7. Create Data Tracks for Both Samples ---
+  # Define distinct colors for the two samples being compared
+  color1 <- "#377EB8" # Blue
+  color2 <- "#E41A1C" # Red
+
+  # Process methylation data for each sample using the helper function
+  tracks1 <- process_methylation(sample1_data, sample1_name, color1)
+  tracks2 <- process_methylation(sample2_data, sample2_name, color2)
+
+  # --- 8. Create Overlay Tracks for Combined Visualization ---
+  # Overlay the points tracks from both samples into a single track
+  ot_points <- OverlayTrack(trackList = list(tracks1$points, tracks2$points), name = "Methylation %")
+  displayPars(ot_points) <- list(background.title = "darkgrey", fontcolor.title="white", cex.title=0.7) # Set overlay track title parameters
+  # Overlay the smoothed line tracks from both samples into a single track
+  ot_smooth <- OverlayTrack(trackList = list(tracks1$smooth, tracks2$smooth), name = "Smoothed Methylation")
+  displayPars(ot_smooth) <- list(background.title = "darkgrey", fontcolor.title="white", cex.title=0.7) # Set overlay track title parameters
+
+  # --- 9. Combine All Tracks into a List for Plotting ---
+  # Define the final list of tracks in the desired plotting order
+  # Include the HMM track only if it was successfully created
+  plot_list <- list(itrack, gtrack, atrack)
+  if (!is.null(hmm_track) && length(hmm_track) > 0 && !grepl("Empty", name(hmm_track))) {
+      plot_list <- c(plot_list, hmm_track)
+  } else {
+      # Add an empty placeholder track if HMM data was missing or invalid
+      plot_list <- c(plot_list, AnnotationTrack(name = "HMM States (No Data)", genome = genome, chromosome = chr, background.title = "darkgrey", fontcolor.title="white"))
+  }
+  # Add the remaining tracks
+  plot_list <- c(plot_list, gene_model, ot_points, ot_smooth)
+
+  # --- 10. Generate the Final Gviz Plot ---
+  # Define relative sizes for each track in the plot
+  track_sizes <- c(0.5, # Ideogram
+                   1,   # Axis
+                   0.5, # Regions Annotation
+                   ifelse(!is.null(hmm_track) && !grepl("Empty", name(hmm_track)), 1.5, 0.1), # HMM states (larger if present, smaller if placeholder)
+                   2,   # Gene Model (larger to show detail)
+                   2.5, # Points Overlay (larger)
+                   2.5) # Smooth Overlay (larger)
+
+  # Call plotTracks to generate the visualization
+  plotTracks(plot_list,
+             from = plot_start, to = plot_end, chromosome = chr, # Define genomic region
+             main = paste("Methylation Profile Comparison:", gene_id), # Main title
+             cex.main = 1.2,          # Main title size
+             sizes = track_sizes,     # Assign calculated track sizes
+             background.title = "grey20", # Default background for all track titles
+             fontcolor.title = "white",    # Default title color
+             cex.title = 0.7,              # Default size for individual track titles
+             showTitle = TRUE             # Ensure track titles are displayed
+             )
+
+  cat("Gviz plot generated for gene", gene_id, "\n")
+
+} # End of plot_gene_methylation_comparison_gviz function
+
+
+# --- Example Usage ---
+# Ensure necessary objects (gr_list, all_exons, hmm, genome) are loaded
+# and correctly formatted before calling the function. `gr_list` should be a list
+# of GRanges objects, where each GRanges has a 'methylation_level' metadata column.
+
+# Example call (using dummy data if real data isn't loaded)
+if (!exists("gr_list") || !exists("all_exons") || !exists("hmm") || !exists("genome")) {
+    cat("Creating dummy data for demonstration purposes.\n")
+    # Dummy methylation data (two samples)
+    set.seed(123)
+    dummy_meth1 <- GRanges(seqnames = "chr1",
+                           ranges = IRanges(start = sample(10000:14900, 400, replace=TRUE), width=1),
+                           methylation_level = sample(0:100, 400, replace=TRUE))
+    dummy_meth2 <- GRanges(seqnames = "chr1",
+                           ranges = IRanges(start = sample(10000:14900, 450, replace=TRUE), width=1),
+                           methylation_level = sample(0:100, 450, replace=TRUE))
+    gr_list <- list(SampleA=dummy_meth1, SampleB=dummy_meth2) # Example list structure
+
+    # Dummy exon data
+    all_exons <- GRanges(seqnames = "chr1",
+                         ranges = IRanges(start=c(11000, 13000, 16000, 18000), end=c(11500, 13500, 16500, 18500)),
+                         strand=c("+", "+", "+", "+"),
+                         gene_id=c("Shtn1", "Shtn1", "Vcan", "Vcan"),
+                         transcript_id=c("T1", "T1", "T2", "T2"),
+                         exon_id=1:4)
+
+    # Dummy HMM data
+    hmm <- GRanges(seqnames = "chr1",
+                   ranges = IRanges(start = seq(9000, 19000, by=1000), width=1000),
+                   name = sample(paste0("State", 1:5), 11, replace=TRUE))
+
+    genome <- "mm10" # Specify genome
+} else {
+    # Assume gr_list, all_exons, hmm, and genome are loaded from user's environment
+    cat("Using pre-loaded data.\n")
+}
+
+
+# Select the gene to plot
+gene_to_plot <- "Shtn1" # Change this to the gene you want to visualize
+
+# Plot methylation comparison for the selected gene
+# Ensure gr_list has at least two elements and they are named
+if (length(gr_list) >= 2 && !is.null(names(gr_list))) {
+    tryCatch({
+      # Call the main plotting function
+      plot_gene_methylation_comparison_gviz(
+          gene_id = gene_to_plot,
+          sample1_data = gr_list[[1]],        # First methylation dataset
+          sample2_data = gr_list[[2]],        # Second methylation dataset
+          sample1_name = names(gr_list)[1],   # Name for first sample
+          sample2_name = names(gr_list)[2],   # Name for second sample
+          exons_gr = all_exons,               # Exon data
+          hmm = hmm,                          # HMM state data
+          genome = genome,                    # Genome build
+          window_size = 10,                   # Smoothing window size
+          flank_width = 1000                  # Flanking region width
+          )
+    }, error = function(e) {
+      # Print error message if plotting fails
+      message(paste("Error plotting gene", gene_to_plot, ":", e$message))
+      # Print traceback for debugging
+      traceback()
+    })
+} else {
+    stop("Need at least two named methylation datasets in 'gr_list' for comparison.")
+}
