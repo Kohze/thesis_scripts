@@ -1,124 +1,45 @@
-# Thesis Scripts: The Elusive Dynamic of the Genome: Novel Sequence Patterns, Splicing and Regulation
+# Thesis Scripts: The Elusive Dynamic of the Genome
 
 ## Overview
 
-This repository contains the R scripts supporting the thesis "The Elusive Dynamic of the Genome: Novel Sequence Patterns, Splicing and Regulation" by Robin Gounder (University of Cambridge, 2025).
+This repository contains the R scripts supporting the analyses presented in the thesis "The Elusive Dynamic of the Genome: Novel Sequence Patterns, Splicing and Regulation" by Robin Kohze (University of Cambridge, 2025).
 
-The scripts implement analyses related to:
+The scripts cover investigations into:
 
-*   Novel Open Reading Frame (nORF) characterization (though scripts for Chapter 2 & 3 focusing on nORFs seem to be missing from the current structure, this README assumes they might exist elsewhere or the focus is Chapters 4 & 5).
-*   Differential Transcript Usage (DTU) analysis during mouse brain development using the ENCODE Mouse Developmental Matrix.
-*   Investigation of epigenetic factors (DNA methylation, HMM chromatin states), sequence motifs, and DNA shape in relation to alternative splicing.
+*   **Novel Open Reading Frame (nORF) characterization:** Including proteochemometric analysis and machine learning classification (Chapter 3).
+*   **Gene Isoform Diversity:** Analyzing isoform usage, correlations with gene features, and comparing single vs. multi-isoform genes (Chapter 4).
+*   **Epigenetic Regulation of Splicing:** Examining the roles of DNA methylation, chromatin states, DNA shape, and sequence motifs in alternative splicing during mouse brain development (Chapter 5).
 
-Key analyses include metadata processing, isoform statistics, temporal classification, methylation correlation, inter-tissue divergence, HMM/motif enrichment, DNA shape analysis, and Gviz visualizations.
+## Repository Structure
 
-## Directory Structure
+The scripts are organized into subdirectories corresponding to thesis chapters or general setup tasks. Each chapter directory contains scripts numbered (`0X_script_name.R`) according to their typical execution order within that chapter's workflow.
 
-The scripts are organized into subdirectories based on the thesis chapters:
+*   **[General_Setup/](./General_Setup/)**: Scripts for metadata processing, WGBS key management, and initial methylation data handling. See the [General Setup README](./General_Setup/README.md).
+*   **[Chapter2/](./Chapter2/)**: Contains a reference to the external code repository for the nORFs.org platform. See the [Chapter 2 README](./Chapter2/README.md).
+*   **[Chapter3/](./Chapter3/)**: Scripts for the high-dimensional analysis of nORFs, including PCM feature extraction, correlation analysis, XGBoost classification, topology analysis, and nORF kernel development. See the [Chapter 3 README](./Chapter3/README.md).
+*   **[Chapter4/](./Chapter4/)**: Scripts analyzing gene isoform diversity, its correlation with gene features, and comparing single- vs. multi-isoform gene characteristics. See the [Chapter 4 README](./Chapter4/README.md).
+*   **[Chapter5/](./Chapter5/)**: Scripts investigating the interplay between epigenetics and splicing, including methylation/expression correlations, divergence analysis, HMM state enrichment, motif enrichment, DNA shape analysis, and Gviz plotting. See the [Chapter 5 README](./Chapter5/README.md).
 
--   **[General_Setup](./General_Setup/README.md):** Contains scripts for general setup, metadata processing, initial data loading, and utility functions.
--   **[Chapter3](./Chapter3/README.md):** Contains scripts related to the high-dimensional analysis of nORFs in Chapter 3.
--   **[Chapter4](./Chapter4/README.md):** Contains scripts related to the dynamic alternative splicing analyses in Chapter 4.
--   **[Chapter5](./Chapter5/README.md):** Contains scripts related to the investigation of epigenetic influences on splicing in Chapter 5.
-
-Please refer to the `README.md` file within each subdirectory for details on the specific inputs, outputs, and purpose of each script.
+Please refer to the `README.md` file within each subdirectory for detailed information on the specific inputs, outputs, workflow, and package requirements for the scripts therein.
 
 ## Dependencies
 
-These scripts rely on several R packages. It is highly recommended to use `renv` for managing package versions to ensure reproducibility. A `renv.lock` file may be included in the repository root (if created).
+These scripts rely on numerous R packages from CRAN and Bioconductor. Key packages include `dplyr`, `ggplot2`, `GenomicRanges`, `SummarizedExperiment`, `Gviz`, `monaLisa`, `xgboost`, `stats`, and others specific to bioinformatics and data analysis.
 
-Key R packages include:
-
-*   Core: `dplyr`, `tidyr`, `data.table`, `stringr`, `purrr`
-*   Plotting: `ggplot2`, `patchwork`, `RColorBrewer`, `ggrepel`, `corrplot`, `ComplexHeatmap`, `circlize`
-*   Genomics: `GenomicRanges`, `Biostrings`, `rtracklayer`, `BSgenome.Mmusculus.UCSC.mm10`, `Gviz`
-*   Statistics: `stats`, `rstatix`, `broom`, `effectsize`, `pheatmap`
-*   Splicing/Motifs: `monaLisa`, `JASPAR2020`, `TFBSTools` (potentially others related to splicing analysis not explicitly listed)
-*   Machine Learning: `caret`, `xgboost` (for ProtR analysis)
-*   Other: `jsonlite`, `xtable`, `kableExtra`, `zoo`, `Rtsne`, `EnhancedVolcano`, `BiocParallel`
-
-Other requirements:
-
-*   R (version >= 4.0 recommended)
-*   Reference Genome: Mouse mm10 assembly (required for `BSgenome`, `monaLisa`, etc.)
-
-## Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone [repository URL]
-    cd thesis_scripts
-    ```
-2.  **Install R packages:**
-    *   **Using `renv` (Recommended):** If a `renv.lock` file exists, run:
-        ```R
-        # Inside R
-        # install.packages("renv") # If you don't have renv
-        renv::restore()
-        ```
-    *   **Manual Installation:** If not using `renv`, install packages manually from CRAN and Bioconductor:
-        ```R
-        # Inside R
-        # Example:
-        install.packages(c("dplyr", "ggplot2", "patchwork", ...))
-        if (!requireNamespace("BiocManager", quietly = TRUE))
-            install.packages("BiocManager")
-        BiocManager::install(c("GenomicRanges", "Biostrings", "Gviz", ...))
-        ```
+**Recommendation:** Use `renv` for managing package dependencies to ensure reproducibility. If a `renv.lock` file is present, run `renv::restore()` in R to install the exact package versions used.
 
 ## Data
 
-*   **Raw Data:** The primary data sources include RNA-Seq and WGBS datasets, likely originating from public repositories like ENCODE. Specific accession numbers might be listed in `General_Setup/wgbs_keys.txt` or `General_Setup/metaScript.R`.
-*   **Metadata:** Metadata linking samples to experimental conditions is crucial and is processed by `General_Setup/metaScript.R`.
-*   **HMM States:** Chromatin state annotations (e.g., from ChromHMM) are required for the HMM enrichment analysis (`hmm_enrichment.R`). Example path suggests location like `./chromHMM/forebrain_13.5_mm10_15_posterior.bed`.
-*   **Input Files:** Many scripts expect specific input files (e.g., `.csv`, `.tsv`, `.RData`, `.rds`) generated by previous steps. Check the individual script READMEs for details.
-*   **Data Organization:** Consider organizing input data in a separate `data/` directory (potentially ignored by git if large) with subfolders for raw, processed, and metadata.
+Input data (e.g., sequence files, annotation files, methylation calls, expression matrices, HMM states) are generally assumed to be available locally and are referenced within the scripts. Check individual script headers and chapter READMEs for specific input requirements and expected data formats.
 
-## Usage / Workflow
+## Usage
 
-A typical workflow might involve:
-
-1.  Running scripts in `General_Setup` to prepare metadata and potentially download/process initial data.
-2.  Running analyses from `Chapter4` focusing on DTU identification and characterization.
-3.  Running analyses from `Chapter5` investigating epigenetic factors, motifs, and DNA shape.
-
-Specific script execution order might be interdependent. Refer to individual READMEs and comments within the scripts.
+Consult the README file within each chapter directory for the recommended workflow and dependencies specific to that chapter's analyses.
 
 ## License
 
-This project is licensed under the MIT License - see the `LICENSE` file for details. (Note: A `LICENSE` file should be added to the repository root).
+MIT
 
 ## Contact
 
-Robin Gounder - [Add GitHub Profile Link or Email if desired]
-
----
-
-*This README provides a general overview. For detailed information on each script, please consult the README files within the `General_Setup`, `Chapter3`, `Chapter4`, and `Chapter5` subdirectories.*
-
-## General Setup / Data Preparation
-
-*   `metaScript.R`: Handles metadata, likely from ENCODE or similar sources, associating file IDs with experimental details.
-*   `wgbs_keys.txt`: Provides ENCODE file accession keys for Whole Genome Bisulfite Sequencing (WGBS) data. (Note: This is a data file, not executable R code).
-*   `metyhl_processing.R`: Placeholder script for initial or general methylation data processing steps (e.g., loading, filtering, QC).
-
-## Chapter 3: High-Dimensional nORF Analysis
-
-*   `pcm_analysis.R`: Performs Proteochemometric (PCM) feature extraction on nORF amino acid sequences, including t-SNE visualization and preparation for XGBoost classification.
-
-## Chapter 4: Dynamic Alternative Splicing
-
-*   `isoform_stats.R`: Calculates and compares correlations between different alternative splicing event types (e.g., ES, IR, A3, A5) at both the isoform and gene levels.
-*   `pearson_corr.R`: Calculates and visualizes the Pearson correlation matrix, likely adapted to show correlations between splicing event types.
-*   `protr_isoforms.R`: Performs proteochemometric (PCM) analysis on isoform amino acid sequences using the ProtR package, including t-SNE visualization and preparation for XGBoost classification.
-*   `isoform_classification.R`: Classifies isoforms based on their temporal expression patterns, calculating metrics like switching events, trends, complex patterns, and replicate stability.
-
-## Chapter 5: Epigenetic Splicing Influence
-
-*   `metyhlation_dtu_type.R`: Analyzes methylation levels and variance across different alternative splicing switch types and genomic regions.
-*   `metyhlation_expression.R`: Investigates the correlation between DNA methylation levels and isoform expression (raw and relative frequency) across genomic regions.
-*   `metyhlation_expression_divergence.R`: Compares methylation and expression profiles between forebrain and midbrain tissues at identical developmental stages, calculating divergence scores.
-*   `hmm_enrichment.R`: Analyzes the enrichment of HMM chromatin states within various genomic features associated with DTU genes, canonical genes, or specific splicing event types.
-*   `monaLisa.R`: Performs motif enrichment analysis using the monaLisa package to identify enriched sequence motifs (k-mers and known TF motifs) in specific genomic regions.
-*   `shape_analysis_post_analysis.R`: Analyzes DNA shape parameters (using DNAshapeR predictions) and compares them between methylated/unmethylated states for DTU vs control genes.
-*   `gviz_plotting.R`: Uses the Gviz package to create detailed genomic visualizations integrating methylation, gene models, HMM states, etc., for specific gene examples.
+Robin Kohze - [GitHub Profile](https://github.com/Kohze)
