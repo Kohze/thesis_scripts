@@ -39,10 +39,21 @@ The scripts are designed to be run sequentially:
         *   `results/chapter4/gene_feature_by_isoform_class_stats.csv` (Statistical test results)
     *   **Packages**: `ggplot2`, `dplyr`, `ggpubr`, `tidyr`, `broom`
 
+5.  **`05_na_analysis.R`**:
+    *   **Purpose**: Analyzes the distribution and impact of NA values in the feature dataset to identify potential biases. Generates summary statistics about NA values by feature calculation method and their impact on biological groups.
+    *   **Inputs**:
+        *   `merged_features_only_df`: Data frame containing feature calculations (must be loaded in R environment)
+        *   `b`: Data frame containing biological group information (must be loaded in R environment)
+    *   **Outputs**:
+        *   Console output with summary tables for:
+            *   Biological group distribution before and after NA removal
+            *   NA metrics by feature calculation method
+    *   **Packages**: `dplyr`, `stringr`
+
 ## Workflow
 
 1.  Ensure the required input files are present in the specified `data/` subdirectories.
-2.  Run the scripts in the numbered order (01, 02, 03, 04).
+2.  Run the scripts in the numbered order (01, 02, 03, 04, 05).
 3.  Check the `results/chapter4/` directory for output plots and tables.
 
 ## Required Packages
