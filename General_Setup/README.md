@@ -11,7 +11,7 @@ The **Mouse ENCODE Matrix** is a comprehensive developmental time series dataset
 
 ### Dataset Overview
 - **Source**: Barbara Wold lab, Caltech
-- **Reference**: ENCODE Project Consortium (2004)
+- **Reference**: ENCODE Project Consortium
 - **Data Type**: RNA-seq
 - **Species**: Mouse (Mus musculus)
 - **Developmental Range**: Embryonic day 10.5 (E10.5) through Postnatal day 0 (P0)
@@ -26,7 +26,7 @@ The **Mouse ENCODE Matrix** is a comprehensive developmental time series dataset
 7. **Lung** - Partial time series (E14.5 to P0)
 
 ### Access
-- **ENCODE Portal**: [Mouse ENCODE Matrix](https://www.encodeproject.org/matrix/?type=Experiment&replicates.library.biosample.donor.organism.scientific_name=Mus+musculus&biosample_ontology.term_name=embryo)
+- **ENCODE Portal**: [Mouse ENCODE Matrix](https://www.encodeproject.org/mouse-development-matrix/?type=Experiment&status=released&related_series.@type=OrganismDevelopmentSeries&replicates.library.biosample.organism.scientific_name=Mus+musculus)
 - **Data Repository**: ENCODE Project Consortium
 - **Citation**: ENCODE Project Consortium. (2004). The ENCODE (ENCyclopedia Of DNA Elements) Project. Science, 306(5696), 636-640.
 
