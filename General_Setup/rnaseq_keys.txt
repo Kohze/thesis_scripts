@@ -1,0 +1,76 @@
+# --- rnaseq_keys.txt ---
+# Purpose: Provides ENCODE file accession keys for RNA-seq data from mouse developmental tissue samples.
+#          Used to download or reference specific RNA-seq datasets for the analysis.
+# Chapter Relevance: Appendix B (RNA-seq Data Sources) / Chapter 5 Setup
+# Source: ENCODE Mouse Development Matrix tissue samples from the Barbara Wold lab at Caltech
+# Reference: ENCODE Project Consortium (2004)
+
+# This file contains RNA-seq sample identifiers for developmental time series analysis
+# covering embryonic day 10.5 through postnatal day 0 across multiple mouse tissues.
+
+# ===================================================
+
+## Forebrain
+# e10.5 = "ENCSR304RDL"
+# e11.5 = "ENCSR160IIN"
+# e12.5 = "ENCSR647QBV"
+# e13.5 = "ENCSR970EWM"
+# e14.5 = "ENCSR185LWM"
+# e15.5 = "ENCSR752RGN"
+# e16.5 = "ENCSR080EVZ"
+# p0 = "ENCSR362AIZ"
+
+## Midbrain
+# e10.5 = "ENCSR764OPZ"
+# e11.5 = "ENCSR307BCA"
+# e12.5 = "ENCSR908JWT"
+# e13.5 = "ENCSR792RJV"
+# e14.5 = "ENCSR343YLB"
+# e15.5 = "ENCSR557RMA"
+# e16.5 = "ENCSR367ZPZ"
+# p0 = "ENCSR719NAJ"
+
+## Hindbrain
+# e10.5 = "ENCSR943LKA"
+# e11.5 = "ENCSR760TOE"
+# e12.5 = "ENCSR420QTO"
+# e13.5 = "ENCSR921PRX"
+# e14.5 = "ENCSR559TRB"
+# e15.5 = "ENCSR401BSG"
+# e16.5 = "ENCSR285WZV"
+# p0 = "ENCSR017JEG"
+
+## Heart
+# e10.5 = "ENCSR049UJU"
+# e11.5 = "ENCSR691OPQ"
+# e12.5 = "ENCSR150CUE"
+# e13.5 = "ENCSR284YKY"
+# e14.5 = "ENCSR727FHP"
+# e15.5 = "ENCSR597UZW"
+# e16.5 = "ENCSR020DGG"
+# p0 = "ENCSR526SEX"
+
+## Liver
+# e11.5 = "ENCSR284AMY"
+# e12.5 = "ENCSR648YEP"
+# e13.5 = "ENCSR448MXQ"
+# e14.5 = "ENCSR867YNV"
+# e15.5 = "ENCSR611PTP"
+# e16.5 = "ENCSR826HIQ"
+# p0 = "ENCSR096STK"
+
+## Limb
+# e10.5 = "ENCSR968QHO"
+# e11.5 = "ENCSR541XZK"
+# e12.5 = "ENCSR750YSX"
+# e13.5 = "ENCSR347SQR"
+# e14.5 = "ENCSR216NEG"
+# e15.5 = "ENCSR830IVQ"
+
+## Lung
+# e14.5 = "ENCSR039ADS"
+# e15.5 = "ENCSR457RRW"
+# e16.5 = "ENCSR992WBR"
+# p0 = "ENCSR982MRY"
+
+# =================================================== 
