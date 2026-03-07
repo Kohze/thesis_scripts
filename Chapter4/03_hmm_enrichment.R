@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter5/03_hmm_enrichment.R ---
+# --- thesis_scripts/Chapter4/03_hmm_enrichment.R ---
 # Purpose: Performs enrichment analysis of genomic features (e.g., genes, enhancers,
 #          CpG islands, repeats) within Hidden Markov Model (HMM) chromatin states.
 #          Uses Fisher's exact test or hypergeometric test to assess significance.
-# Chapter Relevance: 5.4 Chromatin State Analysis
+# Chapter Relevance: 4.4 Chromatin State Analysis
 
 # Load required libraries
 library(GenomicRanges)
@@ -22,7 +22,7 @@ library(parallel) # Optional: For parallelizing tests
 #                     If NULL, the extent of hmm_states might be used, but defining
 #                     an appropriate background is crucial for correct interpretation.
 
-output_dir <- "results/chapter5/"
+output_dir <- "results/chapter4/"
 enrichment_results_csv <- file.path(output_dir, "hmm_state_feature_enrichment.csv")
 
 # Parameters

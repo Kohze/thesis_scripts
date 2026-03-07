@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter5/06_gviz_plotting.R ---
+# --- thesis_scripts/Chapter4/06_gviz_plotting.R ---
 # Purpose: Generates genomic visualizations using the Gviz package.
 #          Combines various data tracks (e.g., gene models, methylation, HMM states,
 #          motif sites, experimental data) for specific genomic regions of interest.
-# Chapter Relevance: Integrates and visualizes findings from previous Chapter 5 analyses.
+# Chapter Relevance: Integrates and visualizes findings from previous Chapter 4 analyses.
 
 # Load required libraries
 library(Gviz)
@@ -23,7 +23,7 @@ library(dplyr)
 #                    (chr, start, end) of regions to visualize.
 # - genome_assembly: String identifier for the genome assembly (e.g., "hg38", "hg19")
 
-output_dir <- "results/chapter5/gviz_plots/"
+output_dir <- "results/chapter4/gviz_plots/"
 plot_file_prefix <- file.path(output_dir, "genomic_region_plot") # Prefix for output files
 
 # Plotting parameters

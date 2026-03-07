@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter5/01_methylation_expression.R ---
+# --- thesis_scripts/Chapter4/01_methylation_expression.R ---
 # Purpose: Analyzes the relationship between DNA methylation levels and gene expression.
 #          Calculates correlations, performs statistical tests (e.g., t-tests)
 #          between methylation groups (e.g., high/low) and expression levels,
@@ -21,7 +21,7 @@ library(broom) # For tidying test results
 # - expression_data: Needs columns like gene_id, expression_value (e.g., log2(TPM+1))
 # - gene_annotations: Needs gene_id and potentially gene_biotype or other categories.
 
-output_dir <- "results/chapter5/"
+output_dir <- "results/chapter4/"
 correlation_plot_file <- file.path(output_dir, "methylation_expression_correlation.pdf")
 boxplot_file <- file.path(output_dir, "methylation_group_expression_boxplot.pdf")
 stats_output_csv <- file.path(output_dir, "methylation_expression_stats.csv")

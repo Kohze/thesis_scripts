@@ -3,7 +3,7 @@
 #          isoformSwitchAnalyzeR package for brain development time course data.
 #          This script processes data for Forebrain, Midbrain, and Hindbrain separately.
 #          Placeholders need to be customized by the user.
-# Chapter Relevance: Chapter 4 (Generates core DTU results)
+# Chapter Relevance: Chapter 3 (Generates core DTU results)
 
 # --- 1. Load Libraries ---
 print("Loading necessary libraries...")
@@ -30,7 +30,7 @@ signalp_path   <- "/path/to/signalp-5.0/bin/signalp"          # Path to SignalP 
 netsurfp2_path <- "/path/to/netsurfP-2/run_netsurfP-2.sh"     # Path to NetSurfP-2 script
 
 # Output Directory
-output_dir <- "./thesis_scripts/chapter4/isoformSwitchAnalyzeR_output" # Directory to save results
+output_dir <- "./thesis_scripts/chapter3/isoformSwitchAnalyzeR_output" # Directory to save results
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
   print(paste("Created output directory:", output_dir))

@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter4/03_isoform_classification.R ---
+# --- thesis_scripts/Chapter3/03_isoform_classification.R ---
 # Purpose: Classifies genes based on the number of isoforms they produce
 #          (e.g., single-isoform vs. multi-isoform genes).
 #          Performs statistical tests (e.g., t-tests, Wilcoxon tests)

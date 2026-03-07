@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter5/05_shape_analysis_post_analysis.R ---
+# --- thesis_scripts/Chapter4/05_shape_analysis_post_analysis.R ---
 # Purpose: Performs post-analysis on DNA shape predictions, potentially integrating
 #          shape features with motif occurrences, chromatin states, or other genomic data.
 #          May involve summarizing shape parameters around motifs or within specific regions.
-# Chapter Relevance: 5.5 Motif Analysis and DNA Shape
+# Chapter Relevance: 4.5 Motif Analysis and DNA Shape
 
 # Load required libraries
 library(GenomicRanges)
@@ -24,7 +24,7 @@ library(ggplot2)
 #                         promoters). Needs a column identifying the feature/motif.
 # - annotations: Optional data frame or GRanges with additional info about the regions.
 
-output_dir <- "results/chapter5/shape_analysis/"
+output_dir <- "results/chapter4/shape_analysis/"
 shape_summary_file <- file.path(output_dir, "dna_shape_summary.csv")
 shape_plot_prefix <- file.path(output_dir, "dna_shape_plot") # Prefix for plots
 

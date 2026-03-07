@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter3/06_norf_kernel_analysis.R ---
+# --- thesis_scripts/Chapter2/06_norf_kernel_analysis.R ---
 # Purpose: Develop and analyze the "nORF Kernel", a score derived from a reduced set
 #          of top PCM features. Includes PCA visualization of the kernel score
 #          and classification using the reduced feature set.
-# Chapter Relevance: 3.5 The nORF-Kernel
+# Chapter Relevance: 2.5 The nORF-Kernel
 
 # Load necessary packages
 library(data.table)

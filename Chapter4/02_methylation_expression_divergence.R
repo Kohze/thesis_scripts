@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter5/02_methylation_expression_divergence.R ---
+# --- thesis_scripts/Chapter4/02_methylation_expression_divergence.R ---
 # Purpose: Analyzes the divergence (e.g., standard deviation, variance, range)
 #          of methylation and expression levels across different conditions
 #          (e.g., tissues, developmental stages, possibly individuals).
@@ -21,7 +21,7 @@ library(ggpubr) # For stat_cor
 # - Columns should be samples/conditions.
 # Also assumes `gene_annotations` dataframe is loaded (needs gene_id and other features).
 
-output_dir <- "results/chapter5/"
+output_dir <- "results/chapter4/"
 divergence_stats_file <- file.path(output_dir, "methylation_expression_divergence_stats.csv")
 div_corr_plot_file <- file.path(output_dir, "methylation_vs_expression_divergence_correlation.pdf")
 div_feature_plot_prefix <- file.path(output_dir, "divergence_vs_feature") # Prefix for multiple plots

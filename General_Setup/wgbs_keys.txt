@@ -1,7 +1,7 @@
 # --- wgbs_keys.txt ---
 # Purpose: Provides ENCODE file accession keys for Whole Genome Bisulfite Sequencing (WGBS) data.
 #          Likely used to download or reference specific datasets for the analysis.
-# Chapter Relevance: Appendix B (WGBS Data Sources) / Chapter 5 Setup
+# Chapter Relevance: Appendix B (WGBS Data Sources) / Chapter 4 Setup
 
 # This file appears to be a list of keys, not executable R code.
 # It should be treated as a supplementary data file or included in documentation.

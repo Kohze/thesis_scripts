@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter3/05_topology_analysis.R ---
+# --- thesis_scripts/Chapter2/05_topology_analysis.R ---
 # Purpose: Analyze nORF structural topology based on predicted PDB structures
 #          and DSSP secondary structure assignments. Calculates solvent accessible area,
 #          Ramachandran angles, and secondary structure element proportions.

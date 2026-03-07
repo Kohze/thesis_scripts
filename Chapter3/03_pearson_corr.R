@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter4/02_pearson_corr.R ---
+# --- thesis_scripts/Chapter3/02_pearson_corr.R ---
 # Purpose: Calculates Pearson correlations between various protein features
 #          (lengths, hydropathy, PI, disorder, etc.) and isoform diversity metrics
 #          (number of isoforms per gene, proportion of protein-coding isoforms).

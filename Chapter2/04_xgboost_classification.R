@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter3/04_xgboost_classification.R ---
+# --- thesis_scripts/Chapter2/04_xgboost_classification.R ---
 # Purpose: Train and evaluate an XGBoost model to classify sequences
 #          (nORF vs ORF) based on their PCM features. Includes feature importance
 #          analysis and hyperparameter tuning using caret.
-# Chapter Relevance: 3.4 High-Dimensional Statistical Analysis
+# Chapter Relevance: 2.4 High-Dimensional Statistical Analysis
 
 # Load necessary packages
 library(data.table)

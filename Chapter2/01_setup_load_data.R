@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter3/01_setup_load_data.R ---
-# Purpose: Load required packages and initial data for Chapter 3 analyses.
+# --- thesis_scripts/Chapter2/01_setup_load_data.R ---
+# Purpose: Load required packages and initial data for Chapter 2 analyses.
 #          Reads nORF GTF, canonical ORF FASTA, and generates/loads random sequences.
 #          Extracts sequence attributes.
-# Chapter Relevance: 3.3, 3.4, 3.5, 3.6 (Data Setup)
+# Chapter Relevance: 2.3, 2.4, 2.5, 2.6 (Data Setup)
 
 ## Package Installation (Commented out - Use main README instructions / renv)
 # # Install and Load the BiocManager package

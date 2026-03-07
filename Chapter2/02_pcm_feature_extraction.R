@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter3/02_pcm_feature_extraction.R ---
+# --- thesis_scripts/Chapter2/02_pcm_feature_extraction.R ---
 # Purpose: Define functions for calculating proteochemometric (PCM) features
 #          and apply them to the nORF, canonical ORF, and random sequences loaded
 #          in the previous step. Saves the calculated features.
-# Chapter Relevance: 3.3 Proteochemometric Analysis
+# Chapter Relevance: 2.3 Proteochemometric Analysis
 
 # Load necessary packages
 library(protr)

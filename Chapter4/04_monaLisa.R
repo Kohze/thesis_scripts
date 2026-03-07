@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter5/04_monaLisa.R ---
+# --- thesis_scripts/Chapter4/04_monaLisa.R ---
 # Purpose: Performs motif enrichment analysis using the monaLisa package.
 #          Identifies known or de novo motifs enriched in specific genomic regions
 #          (e.g., HMM states, differentially methylated regions, promoter regions).
-# Chapter Relevance: 5.5 Motif Analysis and DNA Shape
+# Chapter Relevance: 4.5 Motif Analysis and DNA Shape
 
 # Load required libraries
 library(GenomicRanges)
@@ -26,7 +26,7 @@ library(BiocParallel) # For parallel processing
 # - motif_database: A list or PWMatrixList of known motifs (e.g., from JASPAR2020,
 #                   obtained via motifmatchr or TFBSTools).
 
-output_dir <- "results/chapter5/monaLisa/"
+output_dir <- "results/chapter4/monaLisa/"
 monalisa_results_rds <- file.path(output_dir, "monalisa_enrichment_results.rds")
 enrichment_plot_pdf <- file.path(output_dir, "monalisa_motif_enrichment_plots.pdf")
 heatmap_plot_pdf <- file.path(output_dir, "monalisa_motif_enrichment_heatmap.pdf")

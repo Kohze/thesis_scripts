@@ -6,19 +6,18 @@ This repository contains the R scripts supporting the analyses presented in the 
 
 The scripts cover investigations into:
 
-*   **Novel Open Reading Frame (nORF) characterization:** Including proteochemometric analysis and machine learning classification (Chapter 3).
-*   **Gene Isoform Diversity:** Analyzing isoform usage, correlations with gene features, and comparing single vs. multi-isoform genes (Chapter 4).
-*   **Epigenetic Regulation of Splicing:** Examining the roles of DNA methylation, chromatin states, DNA shape, and sequence motifs in alternative splicing during mouse brain development (Chapter 5).
+*   **Novel Open Reading Frame (nORF) characterization:** Including the nORFs.org platform, proteochemometric analysis and machine learning classification (Chapter 2).
+*   **Gene Isoform Diversity:** Analyzing isoform usage, correlations with gene features, and comparing single vs. multi-isoform genes (Chapter 3).
+*   **Epigenetic Regulation of Splicing:** Examining the roles of DNA methylation, chromatin states, DNA shape, and sequence motifs in alternative splicing during mouse brain development (Chapter 4).
 
 ## Repository Structure
 
 The scripts are organized into subdirectories corresponding to thesis chapters or general setup tasks. Each chapter directory contains scripts numbered (`0X_script_name.R`) according to their typical execution order within that chapter's workflow.
 
 *   **[General_Setup/](./General_Setup/)**: Scripts for metadata processing, WGBS key management, and initial methylation data handling. See the [General Setup README](./General_Setup/README.md).
-*   **[Chapter2/](./Chapter2/)**: Contains a reference to the external code repository for the nORFs.org platform. See the [Chapter 2 README](./Chapter2/README.md).
-*   **[Chapter3/](./Chapter3/)**: Scripts for the high-dimensional analysis of nORFs, including PCM feature extraction, correlation analysis, XGBoost classification, topology analysis, and nORF kernel development. See the [Chapter 3 README](./Chapter3/README.md).
-*   **[Chapter4/](./Chapter4/)**: Scripts analyzing gene isoform diversity, its correlation with gene features, and comparing single- vs. multi-isoform gene characteristics. See the [Chapter 4 README](./Chapter4/README.md).
-*   **[Chapter5/](./Chapter5/)**: Scripts investigating the interplay between epigenetics and splicing, including methylation/expression correlations, divergence analysis, HMM state enrichment, motif enrichment, DNA shape analysis, and Gviz plotting. See the [Chapter 5 README](./Chapter5/README.md).
+*   **[Chapter2/](./Chapter2/)**: Contains the nORFs.org platform reference and scripts for the high-dimensional analysis of nORFs, including PCM feature extraction, correlation analysis, XGBoost classification, topology analysis, and nORF kernel development. See the [Chapter 2 README](./Chapter2/README.md).
+*   **[Chapter3/](./Chapter3/)**: Scripts analyzing gene isoform diversity, its correlation with gene features, and comparing single- vs. multi-isoform gene characteristics. See the [Chapter 3 README](./Chapter3/README.md).
+*   **[Chapter4/](./Chapter4/)**: Scripts investigating the interplay between epigenetics and splicing, including methylation/expression correlations, divergence analysis, HMM state enrichment, motif enrichment, DNA shape analysis, and Gviz plotting. See the [Chapter 4 README](./Chapter4/README.md).
 
 Please refer to the `README.md` file within each subdirectory for detailed information on the specific inputs, outputs, workflow, and package requirements for the scripts therein.
 

@@ -1,7 +1,7 @@
 # --- rnaseq_keys.txt ---
 # Purpose: Provides ENCODE file accession keys for RNA-seq data from mouse developmental tissue samples.
 #          Used to download or reference specific RNA-seq datasets for the analysis.
-# Chapter Relevance: Appendix B (RNA-seq Data Sources) / Chapter 5 Setup
+# Chapter Relevance: Appendix B (RNA-seq Data Sources) / Chapter 4 Setup
 # Source: ENCODE Mouse Development Matrix tissue samples from the Barbara Wold lab at Caltech
 # Reference: ENCODE Project Consortium (2004)
 

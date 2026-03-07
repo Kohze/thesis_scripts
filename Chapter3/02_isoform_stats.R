@@ -1,4 +1,4 @@
-# --- thesis_scripts/Chapter4/01_isoform_stats.R ---
+# --- thesis_scripts/Chapter3/01_isoform_stats.R ---
 # Purpose: Calculates and compares correlations between different alternative splicing
 #          event types (e.g., ES, IR, A3, A5) at both the isoform and gene levels.
 #          Helps understand co-occurrence or mutual exclusivity of splicing events.

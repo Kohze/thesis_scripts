@@ -1,8 +1,8 @@
-# --- thesis_scripts/Chapter3/03_pcm_exploration_correlation.R ---
+# --- thesis_scripts/Chapter2/03_pcm_exploration_correlation.R ---
 # Purpose: Load calculated PCM features and perform exploratory analysis.
 #          Calculates and visualizes feature correlations (corrplot).
 #          Compares feature distributions between nORFs, ORFs, and random sequences.
-# Chapter Relevance: 3.3 Proteochemometric Analysis, 3.4 High-Dimensional Statistical Analysis (partially)
+# Chapter Relevance: 2.3 Proteochemometric Analysis, 2.4 High-Dimensional Statistical Analysis (partially)
 
 # Load necessary packages
 library(data.table)
